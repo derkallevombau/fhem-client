@@ -112,7 +112,7 @@ class FhemClient
 		const code = translateUndefined ? `${useStatement};;${translateUndefined};;my @ret=${invocation};;${processRet}` : `${useStatement};;my @ret=${invocation};;${processRet}`;
 
 		return this.execPerlCode(code, true).then(
-			ret => // Either 'undef' or an array in JSON, or an error message.
+			ret => // Either 'undef' or an array in JSON, or an FHEM error message.
 			{
 				if (ret === 'undef') return;
 
@@ -209,9 +209,11 @@ class FhemClient
 						res.on('end',
 							() =>
 							{
-								body = body.replace('\n', ''); // FHEMWEB appends a newline to the result, remove it.
+								// FHEMWEB appends a newline to the result, remove it.
+								// In case an error message is returned, it already contains a newline.
+								body = body.replace(/\n+$/, '');
 
-								logger.debug(`execCmd: Request succeeded. Response: '${body}'.`);
+								logger.debug(`execCmd: Request succeeded. Response: '${body}'`);
 
 								// If we got a number, return it as such.
 								const number = Number(body);
