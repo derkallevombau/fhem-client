@@ -33,17 +33,26 @@ class FhemClient
 	/**
 	 * Creates and initialises an instance of FhemClient.
 	 * @param {object} options
-	 * @param {string} options.url The URL of the desired FHEMWEB instance: 'http[s]://host:port/webname'
-	 * @param {string} options.username Must be supplied if you have enabled Basic Auth for the respective FHEMWEB instance
-	 * @param {string} options.password Must be supplied if you have enabled Basic Auth for the respective FHEMWEB instance
+	 * @param {string} options.url The URL of the desired FHEMWEB instance: 'http[s]://host:port/webname'.
+	 * @param {string} options.username Must be supplied if you have enabled Basic Auth for the respective FHEMWEB instance.
+	 * @param {string} options.password Must be supplied if you have enabled Basic Auth for the respective FHEMWEB instance.
 	 * @param {Logger} [logger] You can pass any logger instance as long as it provides the methods log(level, ...args), debug(), info(), warn() and error().
+	 * @throws {Error} with code 'EFHEMCL_INVLURL' in case `options.url` is not a valid url string.
 	 */
 	constructor(options, logger)
 	{
 		this.logger = logger ? logger : { log: () => {}, debug: () => {}, info: () => {}, warn: () => {}, error: () => {} };
 		this.fhem   = options;
 
-		this.url    = new URL(options.url);
+		try
+		{
+			this.url = new URL(options.url);
+		}
+		catch (e)
+		{
+			if (e.code === 'ERR_INVALID_URL') this.error(`'${options.url}' is not a valid URL.`, 'INVLURL');
+		}
+
 		this.client = this.url.protocol === 'https:' ? https : http; // Yes, Node.js forces the user to select the appropriate module. // Not putting the ternary if inside one 'require()' for VS Code's type inference to work.
 
 		if (options.username && options.password)
@@ -67,11 +76,12 @@ class FhemClient
 	 * If the function returns a hash (literal, no ref), which is just an even-sized list, you must indicate this.
 	 * Failing to do so will give you an array of key/value pairs.
 	 *
-	 * On the other hand, if you provide true for this and the function returns a scalar or an odd-sized list, the `Promise` will be rejected.
+	 * On the other hand, if you provide true for this and the function returns an odd-sized list, the `Promise` will be rejected.
+	 * This parameter is meaningless if the function returns a scalar.
 	 * @param {...string | number} args The arguments to be passed to the function.
 	 * If an argument is `undefined`, the function will get Perl's undef for that argument.
 	 * @returns {Promise<string | number | void | Array<string | number> | Map<string | number, string | number>>} A `Promise` that will be resolved
-	 * with the result on success or rejected with an `Error` object with code 'EFHEMCL'.
+	 * with the result on success or rejected with one of the following errors.
 	 *
 	 * If the function cannot be found in the module hash or returns undef, the result will be undefined.
 	 *
@@ -79,10 +89,32 @@ class FhemClient
 	 * Furthermore, if the list is even-sized and `functionReturnsHash === true`, the result will be a Map.
 	 *
 	 * In either case, numbers will be returned as numbers, not as strings.
+	 * @throws {Error} with code 'EFHEMCL_RES' in case of response error.
+	 * @throws {Error} with code 'EFHEMCL_ABRT' in case the response closed prematurely.
+	 * @throws {Error} with code 'EFHEMCL_TIMEDOUT' in case connecting timed out.
+	 * @throws {Error} with code 'EFHEMCL_CONNREFUSED' in case the connection has been refused.
+	 * @throws {Error} with code 'EFHEMCL_NETUNREACH' in case the network is unreachable.
+	 * @throws {Error} with code 'EFHEMCL_CONNRESET' in case the connection has been reset by peer.
+	 * @throws {Error} with code 'EFHEMCL_REQ' in case of a different request error.
+	 * @throws {Error} with code 'EFHEMCL_AUTH' in case of wrong username or password.
+	 * @throws {Error} with code 'EFHEMCL_WEBN' in case of a wrong FHEM 'webname'.
+	 * @throws {Error} with code 'EFHEMCL_NOTOKEN' in case FHEMWEB does use but not send the CSRF Token.
+	 * @throws {Error} with code 'EFHEMCL_CF_FHEMERR' in case FHEM returned an error message instead of the function's
+	 * return value, e. g. if `functionName` exists in the module hash, but the corresponding value names a function
+	 * that doesn't exist.
+	 * @throws {Error} with code 'EFHEMCL_CF_ODDLIST' in case `functionReturnsHash === true` and the function returned
+	 * an odd-sized list.
 	 */
 	callFn(name, functionName, passDevHash, functionReturnsHash, ...args)
 	{
-		const { logger, error } = this;
+		// '{ a, b, ... } = obj;' is short for 'a = obj.a; b = obj.b; ...'. Saves us prefixing the objects with 'this.' all the time...
+		const { logger } = this;
+
+		// N.B.: 'const { error } = this;' doesn't work for methods referring
+		// to 'this' themselves: When calling the method via the variable, 'this'
+		// inside the method's body will be undefined since it wasn't called on 'this'.
+		// Instead, we can use 'bind(this)':
+		const error = this.error.bind(this);
 
 		logger.info(`callFn: Invoking ${functionName}() of FHEM device ${name} with arguments`, ['<device hash>', ...args]); // Using spread operator to merge arrays
 
@@ -123,12 +155,9 @@ class FhemClient
 					// @ts-ignore
 					retArray = JSON.parse(ret);
 				}
-				catch (e)
+				catch (e) // ret must be an error message from FHEM.
 				{
-					const message = `callFn: Failed to invoke ${functionName}() of FHEM device ${name}: ${ret}.`;
-
-					logger.error(message);
-					throw error(message);
+					error(`callFn: Failed to invoke ${functionName}() of FHEM device ${name}: ${ret}.`, 'CF_FHEMERR');
 				}
 
 				if (retArray.length === 1) return retArray[0];
@@ -146,10 +175,7 @@ class FhemClient
 					}
 					else
 					{
-						const message = 'callFn: Cannot create a Map from an odd-sized list.';
-
-						logger.error(message);
-						throw error(message);
+						error('callFn: Cannot create a Map from an odd-sized list.', 'CF_ODDLIST');
 					}
 				}
 
@@ -164,7 +190,17 @@ class FhemClient
 	 * @param {boolean} [calledByCallFn] Used internally.
 	 * @returns {Promise<string | number>} A `Promise` that will be resolved
 	 * with the result in its actual data type on success
-	 * or rejected with an `Error` object with code 'EFHEMCL'.
+	 * or rejected with one of the following errors.
+	 * @throws {Error} with code 'EFHEMCL_RES' in case of response error.
+	 * @throws {Error} with code 'EFHEMCL_ABRT' in case the response closed prematurely.
+	 * @throws {Error} with code 'EFHEMCL_TIMEDOUT' in case connecting timed out.
+	 * @throws {Error} with code 'EFHEMCL_CONNREFUSED' in case the connection has been refused.
+	 * @throws {Error} with code 'EFHEMCL_NETUNREACH' in case the network is unreachable.
+	 * @throws {Error} with code 'EFHEMCL_CONNRESET' in case the connection has been reset by peer.
+	 * @throws {Error} with code 'EFHEMCL_REQ' in case of a different request error.
+	 * @throws {Error} with code 'EFHEMCL_AUTH' in case of wrong username or password.
+	 * @throws {Error} with code 'EFHEMCL_WEBN' in case of a wrong FHEM 'webname'.
+	 * @throws {Error} with code 'EFHEMCL_NOTOKEN' in case FHEMWEB does use but not send the CSRF Token.
 	 */
 	execPerlCode(code, calledByCallFn)
 	{
@@ -177,11 +213,22 @@ class FhemClient
 	 * @param {boolean} [calledByCallFn] Used internally.
 	 * @returns {Promise<string | number>} A `Promise` that will be resolved
 	 * with the result in its actual data type on success
-	 * or rejected with an `Error` object with code 'EFHEMCL'.
+	 * or rejected with one of the following errors.
+	 * @throws {Error} with code 'EFHEMCL_RES' in case of response error.
+	 * @throws {Error} with code 'EFHEMCL_ABRT' in case the response closed prematurely.
+	 * @throws {Error} with code 'EFHEMCL_TIMEDOUT' in case connecting timed out.
+	 * @throws {Error} with code 'EFHEMCL_CONNREFUSED' in case the connection has been refused.
+	 * @throws {Error} with code 'EFHEMCL_NETUNREACH' in case the network is unreachable.
+	 * @throws {Error} with code 'EFHEMCL_CONNRESET' in case the connection has been reset by peer.
+	 * @throws {Error} with code 'EFHEMCL_REQ' in case of a different request error.
+	 * @throws {Error} with code 'EFHEMCL_AUTH' in case of wrong username or password.
+	 * @throws {Error} with code 'EFHEMCL_WEBN' in case of a wrong FHEM 'webname'.
+	 * @throws {Error} with code 'EFHEMCL_NOTOKEN' in case FHEMWEB does use but not send the CSRF Token.
 	 */
 	execCmd(cmd, calledByCallFn)
 	{
-		const { logger, url, error } = this; // '{ a, b, ... } = obj;' is short for 'a = obj.a; b = obj.b; ...'
+		const { logger, url } = this;
+		const error = this.error.bind(this);
 
 		// No token => Obtain it and call this method again.
 		if (!url.searchParams.get('fwcsrf')) return this.obtainCsrfToken().then(
@@ -237,29 +284,12 @@ class FhemClient
 						}
 						else // We didn't get a token, but it is needed.
 						{
-							const message = `execCmd: Failed to execute FHEM command '${cmd}': Obviously, this FHEMWEB does use a CSRF token, but it doesn't send it.`;
-
-							logger.error(message);
-							reject(error(message));
+							error(`execCmd: Failed to execute FHEM command '${cmd}': Obviously, this FHEMWEB does use a CSRF token, but it doesn't send it.`, 'NOTOKEN', reject);
 						}
 
 						break;
-					case 401: // Authentication error
-					{
-						const message = `execCmd: Failed to execute FHEM command '${cmd}': Wrong username or password.`;
-
-						logger.error(message);
-						reject(error(message));
-
-						break;
-					}
 					default:
-					{
-						const message = `execCmd: Failed to execute FHEM command '${cmd}': Status: ${res.statusCode}, message: '${res.statusMessage}'.`;
-
-						logger.error(message);
-						reject(error(message));
-					}
+						this.handleStatusCode(res, `execCmd: Failed to execute FHEM command '${cmd}'`, reject);
 				}
 			}
 		);
@@ -269,12 +299,22 @@ class FhemClient
 	 * Obtains the CSRF token, if any, from FHEMWEB without causing a "FHEMWEB WEB CSRF error".
 	 * @returns {Promise<string>} A `Promise` that will be resolved
 	 * with the token or an empty string on success
-	 * or rejected with an `Error` object with code 'EFHEMCL'.
+	 * or rejected with one of the following errors.
+	 * @throws {Error} with code 'EFHEMCL_RES' in case of response error.
+	 * @throws {Error} with code 'EFHEMCL_ABRT' in case the response closed prematurely.
+	 * @throws {Error} with code 'EFHEMCL_TIMEDOUT' in case connecting timed out.
+	 * @throws {Error} with code 'EFHEMCL_CONNREFUSED' in case the connection has been refused.
+	 * @throws {Error} with code 'EFHEMCL_NETUNREACH' in case the network is unreachable.
+	 * @throws {Error} with code 'EFHEMCL_CONNRESET' in case the connection has been reset by peer.
+	 * @throws {Error} with code 'EFHEMCL_REQ' in case of a different request error.
+	 * @throws {Error} with code 'EFHEMCL_AUTH' in case of wrong username or password.
+	 * @throws {Error} with code 'EFHEMCL_WEBN' in case of a wrong FHEM 'webname'.
+	 * @private
 	 * @ignore
 	 */
 	obtainCsrfToken()
 	{
-		const { logger, error } = this;
+		const { logger } = this;
 
 		return this.getWithPromise(
 			(res, resolve, reject) =>
@@ -294,29 +334,40 @@ class FhemClient
 						resolve(token);
 
 						break;
-					case 401: // Authentication error
-					{
-						const message = 'execCmd: Failed to get CSRF token: Wrong username or password.';
-
-						logger.error(message);
-						reject(error(message));
-
-						break;
-					}
 					default:
-					{
-						const message = `execCmd: Failed to get CSRF token: Status: ${res.statusCode}, message: '${res.statusMessage}'.`;
-
-						logger.error(message);
-						reject(error(message));
-					}
+						this.handleStatusCode(res, 'execCmd: Failed to get CSRF token', reject);
 				}
 			}
 		);
 	}
 
-	// For jsdoc2md
-	// * @param {function(http.IncomingMessage, function(any?): void, function(any?): void): void} processResponse
+	/**
+	 * Used by `execCmd` and `obtainCsrfToken' for status codes
+	 * which can be handled in a common way.
+	 * @param {http.IncomingMessage} res
+	 * @param {string} messagePrefix
+	 * @param {(reason?: any) => void} reject
+	 * @private
+	 * @ignore
+	 */
+	handleStatusCode(res, messagePrefix, reject)
+	{
+		const error = this.error.bind(this);
+
+		switch (res.statusCode)
+		{
+			case 401: // Authentication error
+				error(`${messagePrefix}: Wrong username or password.`, 'AUTH', reject);
+
+				break;
+			case 302: // Found => Wrong webname
+				error(`${messagePrefix}: Wrong FHEM 'webname' in ${this.fhem.url}.`, 'WEBN', reject);
+
+				break;
+			default:
+				error(`${messagePrefix}: Status: ${res.statusCode}, message: '${res.statusMessage}'.`, '', reject);
+		}
+	}
 
 	/**
 	 * Wraps a call to `this.client.get()` in a `Promise`.
@@ -325,13 +376,21 @@ class FhemClient
 	 * @param {(res: http.IncomingMessage, resolve: (value?: any) => void, reject: (reason?: any) => void) => void} processResponse
 	 * @returns {Promise<any>} A `Promise` that will be resolved by `processResponse` on success
 	 * or rejected by `processResponse`, the request listener or the response listener
-	 * with an `Error` object with code 'EFHEMCL'.
+	 * with one of the following errors.
+	 * @throws {Error} with code 'EFHEMCL_RES' in case of response error.
+	 * @throws {Error} with code 'EFHEMCL_ABRT' in case the response closed prematurely.
+	 * @throws {Error} with code 'EFHEMCL_TIMEDOUT' in case connecting timed out.
+	 * @throws {Error} with code 'EFHEMCL_CONNREFUSED' in case the connection has been refused.
+	 * @throws {Error} with code 'EFHEMCL_NETUNREACH' in case the network is unreachable.
+	 * @throws {Error} with code 'EFHEMCL_CONNRESET' in case the connection has been reset by peer.
+	 * @throws {Error} with code 'EFHEMCL_REQ' in case of a different request error.
 	 * @private
 	 * @ignore
 	 */
 	getWithPromise(processResponse)
 	{
-		const { logger, error } = this;
+		const { logger } = this;
+		const error = this.error.bind(this);
 
 		return new Promise(
 			(resolve, reject) =>
@@ -340,23 +399,12 @@ class FhemClient
 					res =>
 					{
 						res.on('error',
-							e =>
-							{
-								const message = `execCmd: Response error: ${e.message}.`;
-
-								logger.error(message);
-								reject(error(message));
-							}
+							// @ts-ignore
+							e => error(`execCmd: Response error: Code: ${e.code}, message: ${e.message}`, 'RES', reject)
 						);
 
 						res.on('aborted',
-							() =>
-							{
-								const message = 'execCmd: Response closed prematurely.';
-
-								logger.error(message);
-								reject(error(message));
-							}
+							() => error('execCmd: Response closed prematurely.', 'ABRT', reject)
 						);
 
 						res.on('close', () => logger.debug('execCmd: Connection closed.'));
@@ -366,10 +414,25 @@ class FhemClient
 				).on('error',
 					e =>
 					{
-						const message = `execCmd: Request failed: ${e.message}.`;
-
-						logger.error(message);
-						reject(error(message));
+						// @ts-ignore
+						switch (e.code)
+						{
+							case 'ETIMEDOUT':
+								error(`execCmd: Connecting to ${this.fhem.url} timed out.`, 'TIMEDOUT', reject);
+								break;
+							case 'ECONNREFUSED':
+								error(`execCmd: Connection to ${this.fhem.url} refused. Check port.`, 'CONNREFUSED', reject);
+								break;
+							case 'ENETUNREACH':
+								error(`execCmd: Cannot connect to ${this.fhem.url}: Network is unreachable.`, 'NETUNREACH', reject);
+								break;
+							case 'ECONNRESET':
+								error(`execCmd: Connection reset by ${this.url.host}. Check if '${this.url.protocol}' is the right protocol.`, 'CONNRESET', reject);
+								break;
+							default:
+								// @ts-ignore
+								error(`execCmd: Request failed: Code: ${e.code}, message: ${e.message}`, 'REQ', reject);
+							}
 					}
 				);
 			}
@@ -377,19 +440,27 @@ class FhemClient
 	}
 
 	/**
-	 * Returns an `Error` object constructed
-	 * with `message` and code property set to 'EFHEMCL'.
+	 * Logs `message` as error, constructs an `Error` object with `message`
+	 * and sets its `code` property to 'EFHEMCL_codeSuff'.
+	 * Then, if `reject` function supplied, it is called with the `Error` object;
+	 * otherwise, the `Error` is thrown.
 	 * @param {string} message
+	 * @param {string} codeSuff
+	 * @param {(reason?: any) => void} [reject]
 	 * @private
 	 * @ignore
 	 */
-	error(message)
+	error(message, codeSuff, reject)
 	{
+		this.logger.error(message);
+
 		const e = new Error(message);
 		// @ts-ignore
-		e.code = 'EFHEMCL';
+		e.code = `EFHEMCL_${codeSuff}`;
 
-		return e;
-	}}
+		if (reject) reject(e);
+		else throw e;
+	}
+}
 
 module.exports = FhemClient;
