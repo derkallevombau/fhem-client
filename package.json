@@ -1,6 +1,6 @@
 {
   "name": "fhem-client",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A small Promise-based client for executing FHEM commands via FHEMWEB, supporting SSL, Basic Auth and CSRF Token.",
   "main": "fhem-client.js",
   "author": "derkallevombau",
@@ -10,9 +10,16 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "repository": {},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/derkallevombau/fhem-client.git"
+  },
   "keywords": [
     "Client",
     "FHEM"
-  ]
+  ],
+  "bugs": {
+    "url": "https://github.com/derkallevombau/fhem-client/issues"
+  },
+  "homepage": "https://github.com/derkallevombau/fhem-client#readme"
 }
