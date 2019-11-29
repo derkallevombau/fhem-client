@@ -23,10 +23,24 @@ const https = require('https');
  * Uses Node.js http or https module, depending on the protocol specified in the URL; no further dependencies.
  * @example
  * const FhemClient = require('fhem-client');
- * const fhemClient = new FhemClient({ url: 'https://localhost:8083/fhem', username: 'thatsme', password: 'topsecret' });
+ * const fhemClient = new FhemClient(
+ * 	{
+ * 		url: 'https://localhost:8083/fhem',
+ * 		username: 'thatsme',
+ * 		password: 'topsecret',
+ * 		getOptions: { timeout: 5000 }
+ * 	}
+ * );
  *
- * fhemClient.execCmd('set lamp on').then(() => console.log('Succeeded'), e => console.log('Failed:', e));
- * fhemClient.execCmd('get hub currentActivity').then(result => console.log('Current activity:', result), e => console.log('Failed:', e));
+ * fhemClient.execCmd('set lamp on').then(
+ * 	() => console.log('Succeeded'),
+ * 	e  => console.log('Failed:', e)
+ * );
+ *
+ * fhemClient.execCmd('get hub currentActivity').then(
+ * 	result => console.log('Current activity:', result),
+ * 	e      => console.log('Failed:', e)
+ * );
  */
 class FhemClient
 {
@@ -36,13 +50,20 @@ class FhemClient
 	 * @param {string} options.url The URL of the desired FHEMWEB instance: 'http[s]://host:port/webname'.
 	 * @param {string} options.username Must be supplied if you have enabled Basic Auth for the respective FHEMWEB instance.
 	 * @param {string} options.password Must be supplied if you have enabled Basic Auth for the respective FHEMWEB instance.
+	 * @param {https.RequestOptions} [options.getOptions] Options for http[s].get().
+	 * Defaults to `{ headers: { Connection: 'keep-alive' }, rejectUnauthorized: false }`.
+	 * If you specify additional options, they will be merged with the defaults. If you specify an option that has a default
+	 * value, your value will override the default. This also means that if you specify an object for `headers`, it will
+	 * completely replace the default one. If you specify `timeout`, it will work as expected.
 	 * @param {Logger} [logger] You can pass any logger instance as long as it provides the methods log(level, ...args), debug(), info(), warn() and error().
 	 * @throws {Error} with code 'EFHEMCL_INVLURL' in case `options.url` is not a valid url string.
 	 */
 	constructor(options, logger)
 	{
-		this.logger = logger ? logger : { log: () => {}, debug: () => {}, info: () => {}, warn: () => {}, error: () => {} };
-		this.fhem   = options;
+		this.getOptions = { headers: { Connection: 'keep-alive' }, rejectUnauthorized: false, ...options.getOptions };
+		delete options.getOptions;
+
+		this.fhem = options;
 
 		try
 		{
@@ -53,6 +74,7 @@ class FhemClient
 			if (e.code === 'ERR_INVALID_URL') this.error(`'${options.url}' is not a valid URL.`, 'INVLURL');
 		}
 
+		this.logger = logger ? logger : { log: () => { }, debug: () => { }, info: () => { }, warn: () => { }, error: () => { } };
 		this.client = this.url.protocol === 'https:' ? https : http; // Yes, Node.js forces the user to select the appropriate module. // Not putting the ternary if inside one 'require()' for VS Code's type inference to work.
 
 		if (options.username && options.password)
@@ -62,8 +84,6 @@ class FhemClient
 		}
 
 		this.url.searchParams.set('XHR', '1'); // We just want the result of the command, not the whole page.
-
-		this.getOptions = { headers: { Connection: 'keep-alive' }, rejectUnauthorized: false };
 	}
 
 	/**
@@ -395,7 +415,7 @@ class FhemClient
 		return new Promise(
 			(resolve, reject) =>
 			{
-				this.client.get(this.url, this.getOptions,
+				const req = this.client.get(this.url, this.getOptions,
 					res =>
 					{
 						res.on('error',
@@ -415,6 +435,9 @@ class FhemClient
 					e =>
 					{
 						// @ts-ignore
+						logger.debug(`execCmd: Request error:  Code: ${e.code}, message: ${e.message}`);
+
+						// @ts-ignore
 						switch (e.code)
 						{
 							case 'ETIMEDOUT':
@@ -427,12 +450,28 @@ class FhemClient
 								error(`execCmd: Cannot connect to ${this.fhem.url}: Network is unreachable.`, 'NETUNREACH', reject);
 								break;
 							case 'ECONNRESET':
+								if (this.reqAborted)
+								{
+									this.reqAborted = false;
+									error(`execCmd: Connecting to ${this.fhem.url} timed out.`, 'TIMEDOUT', reject);
+									break;
+								}
+
 								error(`execCmd: Connection reset by ${this.url.host}. Check if '${this.url.protocol}' is the right protocol.`, 'CONNRESET', reject);
 								break;
 							default:
 								// @ts-ignore
 								error(`execCmd: Request failed: Code: ${e.code}, message: ${e.message}`, 'REQ', reject);
 							}
+					}
+				).on('timeout', // N.B.: Setting RequestOptions.timeout merely generates this event; the request must be aborted manually.
+					() =>
+					{
+						logger.debug('Aborting request because timeout value set by user exceeded.');
+
+						// Aborting the request results in ECONNRESET, not what the user would expect on a timeout...
+						this.reqAborted = true;
+						req.abort();
 					}
 				);
 			}

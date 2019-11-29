@@ -1,1 +1,4 @@
 .vstags
+jsconfig.json
+package-lock.json
+tsconfig.json

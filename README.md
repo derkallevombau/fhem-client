@@ -28,15 +28,30 @@ Creates and initialises an instance of FhemClient.
 | options.url | <code>string</code> | The URL of the desired FHEMWEB instance: 'http[s]://host:port/webname'. |
 | options.username | <code>string</code> | Must be supplied if you have enabled Basic Auth for the respective FHEMWEB instance. |
 | options.password | <code>string</code> | Must be supplied if you have enabled Basic Auth for the respective FHEMWEB instance. |
+| [options.getOptions] | <code>https.RequestOptions</code> | Options for http[s].get(). Defaults to `{ headers: { Connection: 'keep-alive' }, rejectUnauthorized: false }`. If you specify additional options, they will be merged with the defaults. If you specify an option that has a default value, your value will override the default. This also means that if you specify an object for `headers`, it will completely replace the default one. If you specify `timeout`, it will work as expected. |
 | [logger] | <code>Logger</code> | You can pass any logger instance as long as it provides the methods log(level, ...args), debug(), info(), warn() and error(). |
 
 **Example**
 ```js
 const FhemClient = require('fhem-client');
-const fhemClient = new FhemClient({ url: 'https://localhost:8083/fhem', username: 'thatsme', password: 'topsecret' });
+const fhemClient = new FhemClient(
+	{
+		url: 'https://localhost:8083/fhem',
+		username: 'thatsme',
+		password: 'topsecret',
+		getOptions: { timeout: 5000 }
+	}
+);
 
-fhemClient.execCmd('set lamp on').then(() => console.log('Succeeded'), e => console.log('Failed:', e));
-fhemClient.execCmd('get hub currentActivity').then(result => console.log('Current activity:', result), e => console.log('Failed:', e));
+fhemClient.execCmd('set lamp on').then(
+	() => console.log('Succeeded'),
+	e  => console.log('Failed:', e)
+);
+
+fhemClient.execCmd('get hub currentActivity').then(
+	result => console.log('Current activity:', result),
+	e      => console.log('Failed:', e)
+);
 ```
 <a name="FhemClient+callFn"></a>
 

@@ -1,6 +1,6 @@
 {
   "name": "fhem-client",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "A small Promise-based client for executing FHEM commands via FHEMWEB, supporting SSL, Basic Auth and CSRF Token.",
   "main": "fhem-client.js",
   "author": "derkallevombau",
