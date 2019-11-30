@@ -418,6 +418,9 @@ class FhemClient
 				const req = this.client.get(this.url, this.getOptions,
 					res =>
 					{
+						// Remove 'timeout' listener as soon as we receive a response.
+						req.removeAllListeners('timeout');
+
 						res.on('error',
 							// @ts-ignore
 							e => error(`execCmd: Response error: Code: ${e.code}, message: ${e.message}`, 'RES', reject)
@@ -435,12 +438,12 @@ class FhemClient
 					e =>
 					{
 						// @ts-ignore
-						logger.debug(`execCmd: Request error:  Code: ${e.code}, message: ${e.message}`);
+						logger.debug(`execCmd: Request error: Code: ${e.code}, message: ${e.message}`);
 
 						// @ts-ignore
 						switch (e.code)
 						{
-							case 'ETIMEDOUT':
+							case 'ETIMEDOUT': // This has nothing to do with 'timeout' option. There is a built-in timeout, but that's pretty long.
 								error(`execCmd: Connecting to ${this.fhem.url} timed out.`, 'TIMEDOUT', reject);
 								break;
 							case 'ECONNREFUSED':
@@ -464,12 +467,20 @@ class FhemClient
 								error(`execCmd: Request failed: Code: ${e.code}, message: ${e.message}`, 'REQ', reject);
 							}
 					}
-				).on('timeout', // N.B.: Setting RequestOptions.timeout merely generates this event; the request must be aborted manually.
+				).on('timeout',
 					() =>
 					{
+						// N.B.: Setting RequestOptions.timeout merely generates this event when the specified time has elapsed,
+						// the request must be aborted manually.
+						// Furthermore, this event is emitted even after the response has been received. In this case, aborting
+						// the request would not harm, but setting the flag below would result in the next actual ECONNRESET being
+						// incorrectly treated as ETIMEOUT. Thus, we remove this listener as soon as we receive a response.
+						// This event will not be emitted after the 'error' event has been emitted.
+
 						logger.debug('Aborting request because timeout value set by user exceeded.');
 
 						// Aborting the request results in ECONNRESET, not what the user would expect on a timeout...
+						// Thus, we set a flag that causes next ECONNRESET to be treated as ETIMEDOUT.
 						this.reqAborted = true;
 						req.abort();
 					}
