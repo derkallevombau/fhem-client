@@ -7,8 +7,16 @@
 const http  = require('http');
 const https = require('https');
 
-// eslint-disable-next-line no-unused-vars
-const types = require('./fhem-client-types');
+/**
+ * @typedef { (level: string, ...args: any[]) => void } LogMethod
+ */
+/**
+ * @typedef { (message: any, ...args: any[]) => void } LoggerLevelMethod
+ */
+/**
+ * Logger interface
+ * @typedef {{ log: LogMethod, debug: LoggerLevelMethod, info: LoggerLevelMethod, warn: LoggerLevelMethod, error: LoggerLevelMethod }} Logger
+ */
 
 /**
  * A small Promise-based client for executing FHEM commands via FHEMWEB, supporting SSL, Basic Auth and CSRF Token.
@@ -47,7 +55,7 @@ class FhemClient
 	 * If you specify additional options, they will be merged with the defaults. If you specify an option that has a default
 	 * value, your value will override the default. This also means that if you specify an object for `headers`, it will
 	 * completely replace the default one. If you specify `timeout`, it will work as expected.
-	 * @param {types.Logger} [logger] You can pass any logger instance as long as it provides the methods log(level, ...args), debug(), info(), warn() and error().
+	 * @param {Logger} [logger] You can pass any logger instance as long as it provides the methods log(level, ...args), debug(), info(), warn() and error().
 	 * @throws {Error} with code 'EFHEMCL_INVLURL' in case `options.url` is not a valid url string.
 	 */
 	constructor(options, logger)
@@ -66,17 +74,7 @@ class FhemClient
 			if (e.code === 'ERR_INVALID_URL') this.error(`'${options.url}' is not a valid URL.`, 'INVLURL');
 		}
 
-		if (logger) this.logger = logger;
-		else
-		{
-			// Use dummy logger if no logger provided.
-
-			const dummyFn = () => {};
-			this.logger = {};
-
-			for (const fnName of ['log', 'debug', 'info', 'warn', 'error', 'fatal']) this.logger[fnName] = dummyFn;
-		}
-
+		this.logger = logger ? logger : { log: () => { }, debug: () => { }, info: () => { }, warn: () => { }, error: () => { } };
 		this.client = this.url.protocol === 'https:' ? https : http; // Yes, Node.js forces the user to select the appropriate module. // Not putting the ternary if inside one 'require()' for VS Code's type inference to work.
 
 		if (options.username && options.password)
@@ -368,7 +366,7 @@ class FhemClient
 	 * which can be handled in a common way.
 	 * @param {http.IncomingMessage} res
 	 * @param {string} messagePrefix
-	 * @param {types.RejectFn} reject
+	 * @param {(reason?: any) => void} reject
 	 * @private
 	 * @ignore
 	 */
@@ -395,7 +393,7 @@ class FhemClient
 	 * Wraps a call to `this.client.get()` in a `Promise`.
 	 * Handler that will be called on server response with the response object,
 	 * as well as the two functions to resolve or reject the `Promise`.
-	 * @param {types.ProcessResponseFn} processResponse
+	 * @param {(res: http.IncomingMessage, resolve: (value?: any) => void, reject: (reason?: any) => void) => void} processResponse
 	 * @returns {Promise<any>} A `Promise` that will be resolved by `processResponse` on success
 	 * or rejected by `processResponse`, the request listener or the response listener
 	 * with one of the following errors.
@@ -498,7 +496,7 @@ class FhemClient
 	 * otherwise, the `Error` is thrown.
 	 * @param {string} message
 	 * @param {string} codeSuff
-	 * @param {types.RejectFn} [reject]
+	 * @param {(reason?: any) => void} [reject]
 	 * @private
 	 * @ignore
 	 */
