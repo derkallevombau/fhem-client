@@ -1,0 +1,15 @@
+{
+    "compilerOptions": {
+        "module": "CommonJS",
+        "target": "ES2019",
+        "lib": ["ES2019"],
+		"rootDir": "src",
+        "outDir": "out",
+        "sourceMap": true,
+		"removeComments": true,
+		"pretty": true,
+		"declaration": true,
+		"declarationMap": true,
+		"baseUrl": "./"
+    }
+}
