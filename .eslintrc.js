@@ -8,11 +8,19 @@ module.exports = {
 	},
 	"parser": "@typescript-eslint/parser",
 	"parserOptions": {
-		"project": "./tsconfig.json",
-		"sourceType": "module"
+		/// Core parser options
+		"ecmaVersion": 2019,
+		// For a module, place a .eslintrc.js in src with contents
+		// 'module.exports = { "parserOptions": { "sourceType": "module" } };'
+		// to override this option.
+		"sourceType": "script",
+		/// Options for @typescript-eslint/parser
+		"tsconfigRootDir": __dirname,
+		"project": "./tsconfig.json"
 	},
 	"plugins": [
-		"@typescript-eslint",
+		"@typescript-eslint/eslint-plugin",
+		"eslint-plugin-tsdoc"
 	],
 	"extends": [
 		"eslint:recommended",
@@ -21,37 +29,31 @@ module.exports = {
 		"plugin:@typescript-eslint/recommended-requiring-type-checking"
 	],
 	"rules": {
-		//// Additionally enabled (N.B.: The corresponding base rules must be disabled)
+		/// Additionally enabled (N.B.: The corresponding base rules must be disabled)
 		"no-extra-parens": "off",
 		"@typescript-eslint/no-extra-parens": "warn",
+
 		"semi": "off",
 		"@typescript-eslint/semi": "warn",
-    	"brace-style": "off",
+
+		"brace-style": "off",
     	"@typescript-eslint/brace-style": ["warn", "allman", { "allowSingleLine": true }],
+
 		"quotes": "off",
 		"@typescript-eslint/quotes": ["warn", "single", { "avoidEscape": true }],
-		//// Adjustments
+		/// Adjustments
 		"@typescript-eslint/no-use-before-define": ["error", "nofunc"], // Functions are hoisted
+
 		"camelcase": "off",
     	"@typescript-eslint/camelcase": ["warn", { "properties": "always", "genericType": "always" }],
-		//// Disabled
+		/// Disabled
 		// Annoying to get this warning even if the return type is inferred.
-		"@typescript-eslint/explicit-function-return-type": "off"
-		// 	"@typescript-eslint/class-name-casing": "error",
-		// 	"@typescript-eslint/member-delimiter-style": [
-		// 		"off",
-		// 		{
-		// 			"multiline": {
-		// 				"delimiter": "none",
-		// 				"requireLast": true
-		// 			},
-		// 			"singleline": {
-		// 				"delimiter": "semi",
-		// 				"requireLast": false
-		// 			}
-		// 		}
-		// 	],
-		// 	"no-redeclare": "error",
-		// 	"no-unused-expressions": "error",
+		"@typescript-eslint/explicit-function-return-type": "off",
+		// Dispensable and doesn't take into account that you might want
+		// to align consecutive lines.
+		"@typescript-eslint/type-annotation-spacing": "off",
+
+		/// eslint-plugin-tsdoc
+		"tsdoc/syntax": "warn"
 	}
 };
