@@ -4,7 +4,7 @@
         "target": "ES2019",
         "lib": ["ES2019"],
 		"rootDir": "src",
-        "outDir": "out",
+        "outDir": "lib",
         "sourceMap": true,
 		"removeComments": true,
 		"pretty": true,
