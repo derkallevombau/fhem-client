@@ -49,9 +49,12 @@ module.exports = {
 		/// Disabled
 		// Annoying to get this warning even if the return type is inferred.
 		"@typescript-eslint/explicit-function-return-type": "off",
+
 		// Dispensable and doesn't take into account that you might want
 		// to align consecutive lines.
 		"@typescript-eslint/type-annotation-spacing": "off",
+
+		"@typescript-eslint/no-explicit-any": "off",
 
 		/// eslint-plugin-tsdoc
 		"tsdoc/syntax": "warn"
