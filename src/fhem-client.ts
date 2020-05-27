@@ -1,29 +1,75 @@
-/**
- * @file fhem-client.js
- * Created on: Oct 04, 2019
- * @author derkallevombau
+/*
+ * fhem-client.ts
+ * Author: derkallevombau
+ * Created: Oct 04, 2019
  */
 
-const http  = require('http');
-const https = require('https');
+import * as http from 'http';
+import * as https from 'https';
+import { URL } from 'url';
 
-/**
- * @typedef { (level: string, ...args: any[]) => void } LogMethod
- */
-/**
- * @typedef { (message: any, ...args: any[]) => void } LoggerLevelMethod
- */
-/**
- * Logger interface
- * @typedef {{ log: LogMethod, debug: LoggerLevelMethod, info: LoggerLevelMethod, warn: LoggerLevelMethod, error: LoggerLevelMethod }} Logger
- */
+type LogMethod = (level: string, ...args: any[]) => void;
+type LoggerLevelMethod = (message: any, ...args: any[]) => void;
+
+interface Logger
+{
+	log  : LogMethod;
+	debug: LoggerLevelMethod;
+	info : LoggerLevelMethod;
+	warn : LoggerLevelMethod;
+	error: LoggerLevelMethod;
+}
+
+interface FhemOptions
+{
+	/**
+	 * The URL of the desired FHEMWEB instance: 'http[s]://&lt;host&gt;:&lt;port&gt;/webname'.
+	 */
+	url: string;
+
+	/**
+	 * Must be supplied if you have enabled Basic Auth for the respective FHEMWEB instance.
+	 */
+	username: string;
+
+	/**
+	 * Must be supplied if you have enabled Basic Auth for the respective FHEMWEB instance.
+	 */
+	password: string;
+}
+
+interface Options extends FhemOptions
+{
+	/**
+	 * Options for http[s].get.
+	 * Defaults to `{ headers: { Connection: 'keep-alive' }, rejectUnauthorized: false }`.
+	 * If you specify additional options, they will be merged with the defaults. If you specify an option that has a default
+	 * value, your value will override the default. This also means that if you specify an object for `headers`, it will
+	 * completely replace the default one. If you specify `timeout`, it will work as expected.
+	 */
+	getOptions?: https.RequestOptions;
+
+	/**
+	 * An array whose elements are arrays containing an error code
+	 * and a retry interval in millis.
+	 * If `expirationPeriod` property has been set to a positive value and a request fails, then, if the respective error code has a positive
+	 * retry interval, it will be reissued after the specified time until it succeeds or expires.
+	 * Some errors already have a default retry interval; you can use this parameter to override defaults and to set retry intervals
+	 * for errors that do not have a default one.
+	 */
+	retryIntervals?: [string, number][];
+
+	/**
+	 * You can pass any logger instance as long as it provides the methods log(level, ...args), debug, info, warn and error.
+	 */
+	logger?: Logger;
+}
 
 /**
  * Returns a `Promise` that will be resolved after `ms` millis.
- * @param {number} ms
- * @ignore
+ * @param ms - Time in millis.
  */
-function sleep(ms)
+function sleep(ms: number)
 {
 	return new Promise(resolve => setTimeout(resolve, ms));
 }
@@ -32,10 +78,12 @@ function sleep(ms)
  * A small Promise-based client for executing FHEM commands via FHEMWEB, supporting SSL, Basic Auth and CSRF Token.
  * Uses Node.js http or https module, depending on the protocol specified in the URL; no further dependencies.
  *
- * New since 0.1.4: Retry on error. See ctor param `options.retryIntervals` and property `expirationPeriod`.
- * New since 0.1.2: Specify options for http[s].get() via ctor param `options.getOptions`.
+ * ### Changelog
+ * - 0.1.4: Retry on error. See ctor param `options.retryIntervals` and property [expirationPeriod](FhemClient+expirationPeriod).
+ * - 0.1.2: Specify options for http[s].get via ctor param `options.getOptions`.
  *
- * @example
+ * ### Example
+ * ```
  * const FhemClient = require('fhem-client');
  * const fhemClient = new FhemClient(
  * 	{
@@ -50,40 +98,25 @@ function sleep(ms)
  *
  * fhemClient.execCmd('set lamp on').then(
  * 	() => console.log('Succeeded'),
- * 	e  => console.log(`Error: Message: ${e.message}, code: ${e.code}`)
+ * 	e  => console.log(`Error: Message: ${e.message}, code: ${e['code']}`)
  * );
  *
  * fhemClient.execCmd('get hub currentActivity').then(
  * 	result => console.log('Current activity:', result),
- * 	e      => console.log(`Error: Message: ${e.message}, code: ${e.code}`)
+ * 	e      => console.log(`Error: Message: ${e.message}, code: ${e['code']}`)
  * );
+ * ```
  */
 class FhemClient
 {
 	/**
 	 * FHEM URL, username and password.
-	 * @type FhemOptions
-	 * @typedef {object} FhemOptions
-	 * @property {string} FhemOptions.url
-	 * @property {string} FhemOptions.username
-	 * @property {string} FhemOptions.password
-	 * @private
-	 * @ignore
 	 */
-	#fhemOptions;
+	private fhemOptions: FhemOptions;
 
-	/**
-	 * @type https.RequestOptions
-	 * @private
-	 * @ignore
-	 */
-	#getOptions = { headers: { Connection: 'keep-alive' }, rejectUnauthorized: false };
+	private getOptions: https.RequestOptions = { headers: { Connection: 'keep-alive' }, rejectUnauthorized: false };
 
-	/**
-	 * @private
-	 * @ignore
-	 */
-	#retryIntervalFromCode = new Map(
+	private retryIntervalFromCode = new Map(
 		[
 			['EFHEMCL_RES', 500],
 			['EFHEMCL_ABRT', 500],
@@ -93,121 +126,92 @@ class FhemClient
 		]
 	);
 
-	/**
-	 * @type Logger
-	 * @private
-	 * @ignore
-	 */
-	#logger;
+	private logger: Logger;
+	private url: URL;
+
+	// typeof is crucial here since http and
+	// https are modules.
+	private client: typeof http | typeof https;
 
 	/**
-	 * @type URL
-	 * @private
-	 * @ignore
+	 * Flag indicating whether we aborted the current request
+	 * because it timed out.
 	 */
-	#url
-
-	/**
-	 * @type http | https
-	 * @private
-	 * @ignore
-	 */
-	#client
+	private reqAborted: boolean;
 
 	/**
 	 * Time in millis after which to discard a failed request.
 	 * See ctor parameter `options.retryIntervals`.
-	 * @default 0
-	 * @type number
-	 * @public
 	 */
 	expirationPeriod = 0;
 
 	/**
 	 * Creates and initialises an instance of FhemClient.
-	 * @param {object} options
-	 * @param {string} options.url The URL of the desired FHEMWEB instance: 'http[s]://host:port/webname'.
-	 * @param {string} options.username Must be supplied if you have enabled Basic Auth for the respective FHEMWEB instance.
-	 * @param {string} options.password Must be supplied if you have enabled Basic Auth for the respective FHEMWEB instance.
-	 * @param {https.RequestOptions} [options.getOptions] Options for http[s].get().
-	 * Defaults to `{ headers: { Connection: 'keep-alive' }, rejectUnauthorized: false }`.
-	 * If you specify additional options, they will be merged with the defaults. If you specify an option that has a default
-	 * value, your value will override the default. This also means that if you specify an object for `headers`, it will
-	 * completely replace the default one. If you specify `timeout`, it will work as expected.
-	 * @param {Array<[string, number]>} [options.retryIntervals] An array whose elements are arrays containing an error code
-	 * and a retry interval in millis.
-	 * If `expirationPeriod` property has been set to a positive value and a request fails, then, if the respective error code has a positive
-	 * retry interval, it will be reissued after the specified time until it succeeds or expires.
-	 * Some errors already have a default retry interval; you can use this parameter to override defaults and to set retry intervals
-	 * for errors that do not have a default one.
-	 * @param {Logger} [logger] You can pass any logger instance as long as it provides the methods log(level, ...args), debug(), info(), warn() and error().
-	 * @throws {Error} with code 'EFHEMCL_INVLURL' in case `options.url` is not a valid url string.
+	 * @param options - An `object`
+	 * @param logger - You can pass any logger instance as long as it provides the methods log(level, ...args), debug(), info(), warn() and error.
+	 * @throws Error with code 'EFHEMCL_INVLURL' in case `options.url` is not a valid url string.
 	 */
-	constructor(options, logger)
+	constructor(options: Options, logger?: Logger)
 	{
 		try
 		{
-			this.#url = new URL(options.url);
+			this.url = new URL(options.url);
 		}
 		catch (e)
 		{
-			if (e.code === 'ERR_INVALID_URL') this.#error(`'${options.url}' is not a valid URL.`, 'INVLURL');
+			if (e.code === 'ERR_INVALID_URL') this.error(`'${options.url}' is not a valid URL.`, 'INVLURL');
 		}
 
 		// Merge user-provided get options with defaults and remove from 'options'.
 		// N.B.: If options.getOptions is undefined, it just won't contribute anyting ('{ ...undefined } === { }').
-		this.#getOptions = { ...this.#getOptions, ...options.getOptions };
+		this.getOptions = { ...this.getOptions, ...options.getOptions };
 		delete options.getOptions;
 
 		// Merge user-provided retry intervals with defaults and remove from 'options'.
 		if (options.retryIntervals)
 			for (const codeAndInterval of options.retryIntervals)
-				this.#retryIntervalFromCode.set(codeAndInterval[0], codeAndInterval[1]);
+				this.retryIntervalFromCode.set(codeAndInterval[0], codeAndInterval[1]);
 		delete options.retryIntervals;
 
 		// Remaining entries are FHEM options.
-		this.#fhemOptions = options;
+		this.fhemOptions = options;
 
-		if (logger) this.#logger = logger;
+		if (logger) this.logger = logger;
 		else
 		{
 			// Use dummy logger if no logger provided.
 
-			const dummyFn = () => {};
-			// @ts-ignore
-			this.#logger = {};
+			const dummyFn = () => { /* Nothing to do. */ };
 
-			for (const fnName of ['log', 'debug', 'info', 'warn', 'error']) this.#logger[fnName] = dummyFn;
+			for (const fnName of ['log', 'debug', 'info', 'warn', 'error']) this.logger[fnName] = dummyFn;
 		}
 
-		this.#client = this.#url.protocol === 'https:' ? https : http; // Yes, Node.js forces the user to select the appropriate module. // Not putting the ternary if inside one 'require()' for VS Code's type inference to work.
-		// this.#client = this.#url.protocol === 'https:' ? https : http; // Yes, Node.js forces the user to select the appropriate module. // Not putting the ternary if inside one 'require()' for VS Code's type inference to work.
+		this.client = this.url.protocol === 'https:' ? https : http; // Yes, Node.js forces the user to select the appropriate module.
 
 		if (options.username && options.password)
 		{
-			this.#url.username = options.username;
-			this.#url.password = options.password;
+			this.url.username = options.username;
+			this.url.password = options.password;
 		}
 
-		this.#url.searchParams.set('XHR', '1'); // We just want the result of the command, not the whole page.
+		this.url.searchParams.set('XHR', '1'); // We just want the result of the command, not the whole page.
 	}
 
 	/**
 	 * Request FHEMWEB to call a registered module function. This method corresponds to FHEM's Perl function 'CallFn'.
-	 * @param {string} name The name of the device to call the function for.
-	 * @param {string} functionName The name of the function as used to register it in the module hash.
-	 * @param {boolean} [passDevHash] Whether the ref to the instance hash of the device should be passed to the function as first argument. Defaults to `false`.
-	 * @param {boolean} [functionReturnsHash] Whether the function returns a hash that should be transformed into a Map. Defaults to `false`.
+	 * @param name - The name of the device to call the function for.
+	 * @param functionName - The name of the function as used to register it in the module hash.
+	 * @param passDevHash - (Optional) Whether the ref to the instance hash of the device should be passed to the function as first argument. Defaults to `false`.
+	 * @param functionReturnsHash - (Optional) Whether the function returns a hash that should be transformed into a Map. Defaults to `false`.
 	 *
 	 * If the function returns a hash (literal, no ref), which is just an even-sized list, you must indicate this.
 	 * Failing to do so will give you an array of key/value pairs.
 	 *
 	 * On the other hand, if you provide true for this and the function returns an odd-sized list, the `Promise` will be rejected.
 	 * This parameter is meaningless if the function returns a scalar.
-	 * @param {...string | number} args The arguments to be passed to the function.
+	 * @param args - The arguments to be passed to the function.
 	 * If an argument is `undefined`, the function will get Perl's undef for that argument.
-	 * @returns {Promise<string | number | void | Array<string | number> | Map<string | number, string | number>>} A `Promise` that will be resolved
-	 * with the result on success or rejected with one of the following errors.
+	 * @returns A `Promise` that will be resolved with the result on success or rejected with one of the following errors.
 	 *
 	 * If the function cannot be found in the module hash or returns undef, the result will be undefined.
 	 *
@@ -215,76 +219,61 @@ class FhemClient
 	 * Furthermore, if the list is even-sized and `functionReturnsHash === true`, the result will be a Map.
 	 *
 	 * In either case, numbers will be returned as numbers, not as strings.
-	 * @throws {Error} with code 'EFHEMCL_RES' in case of response error (default retry interval: 500 ms).
-	 * @throws {Error} with code 'EFHEMCL_ABRT' in case the response closed prematurely (default retry interval: 500 ms).
-	 * @throws {Error} with code 'EFHEMCL_TIMEDOUT' in case connecting timed out (default retry interval: 10000 ms).
-	 * @throws {Error} with code 'EFHEMCL_CONNREFUSED' in case the connection has been refused (default retry interval: 10000 ms).
-	 * @throws {Error} with code 'EFHEMCL_NETUNREACH' in case the network is unreachable (default retry interval: 10000 ms).
-	 * @throws {Error} with code 'EFHEMCL_CONNRESET' in case the connection has been reset by peer.
-	 * @throws {Error} with code 'EFHEMCL_REQ' in case of a different request error.
-	 * @throws {Error} with code 'EFHEMCL_AUTH' in case of wrong username or password.
-	 * @throws {Error} with code 'EFHEMCL_WEBN' in case of a wrong FHEM 'webname'.
-	 * @throws {Error} with code 'EFHEMCL_NOTOKEN' in case FHEMWEB does use but not send the CSRF Token.
-	 * @throws {Error} with code 'EFHEMCL_CF_FHEMERR' in case FHEM returned an error message instead of the function's
+	 * @throws Error with code 'EFHEMCL_RES' in case of response error (default retry interval: 500 ms).
+	 * @throws Error with code 'EFHEMCL_ABRT' in case the response closed prematurely (default retry interval: 500 ms).
+	 * @throws Error with code 'EFHEMCL_TIMEDOUT' in case connecting timed out (default retry interval: 10000 ms).
+	 * @throws Error with code 'EFHEMCL_CONNREFUSED' in case the connection has been refused (default retry interval: 10000 ms).
+	 * @throws Error with code 'EFHEMCL_NETUNREACH' in case the network is unreachable (default retry interval: 10000 ms).
+	 * @throws Error with code 'EFHEMCL_CONNRESET' in case the connection has been reset by peer.
+	 * @throws Error with code 'EFHEMCL_REQ' in case of a different request error.
+	 * @throws Error with code 'EFHEMCL_AUTH' in case of wrong username or password.
+	 * @throws Error with code 'EFHEMCL_WEBN' in case of a wrong FHEM 'webname'.
+	 * @throws Error with code 'EFHEMCL_NOTOKEN' in case FHEMWEB does use but not send the CSRF Token.
+	 * @throws Error with code 'EFHEMCL_CF_FHEMERR' in case FHEM returned an error message instead of the function's
 	 * return value, e. g. if `functionName` exists in the module hash, but the corresponding value names a function
 	 * that doesn't exist.
-	 * @throws {Error} with code 'EFHEMCL_CF_ODDLIST' in case `functionReturnsHash === true` and the function returned
+	 * @throws Error with code 'EFHEMCL_CF_ODDLIST' in case `functionReturnsHash === true` and the function returned
 	 * an odd-sized list.
 	 */
-	callFn(name, functionName, passDevHash, functionReturnsHash, ...args)
+	callFn(name: string, functionName: string, passDevHash?: boolean, functionReturnsHash?: boolean, ...args: (string | number)[]): Promise<string | number | void | string[] | number[] | Map<string | number, string | number>>
 	{
-		return this.#callAndRetry(this.#callFn_, name, functionName, passDevHash, functionReturnsHash, ...args);
+		// 'callAndRetry' calls the provided method via 'apply', so there is no problem.
+		// eslint-disable-next-line @typescript-eslint/unbound-method
+		return this.callAndRetry(this.callFn_, name, functionName, passDevHash, functionReturnsHash, ...args);
 	}
 
 	/**
 	 * Actual 'callFn' before implementing retry feature.
-	 * Since private methods are not supported yet (Node.js v12.13.1),
-	 * we use a private field with a lambda assigned as a workaround
-	 * for the time being.
-	 * @param {string} name
-	 * @param {string} functionName
-	 * @param {boolean} [passDevHash]
-	 * @param {boolean} [functionReturnsHash]
-	 * @param {...string | number} args
-	 * @returns {Promise<string | number | void | Array<string | number> | Map<string | number, string | number>>}
-	 * @throws {Error} with code 'EFHEMCL_RES'
-	 * @throws {Error} with code 'EFHEMCL_ABRT'
-	 * @throws {Error} with code 'EFHEMCL_TIMEDOUT'
-	 * @throws {Error} with code 'EFHEMCL_CONNREFUSED'
-	 * @throws {Error} with code 'EFHEMCL_NETUNREACH'
-	 * @throws {Error} with code 'EFHEMCL_CONNRESET'
-	 * @throws {Error} with code 'EFHEMCL_REQ'
-	 * @throws {Error} with code 'EFHEMCL_AUTH'
-	 * @throws {Error} with code 'EFHEMCL_WEBN'
-	 * @throws {Error} with code 'EFHEMCL_NOTOKEN'
-	 * @throws {Error} with code 'EFHEMCL_CF_FHEMERR'
-	 * @throws {Error} with code 'EFHEMCL_CF_ODDLIST'
-	 * @private
-	 * @ignore
 	 */
-	#callFn_ = (name, functionName, passDevHash, functionReturnsHash, ...args) =>
-	{
-		const logger = this.#logger;
+	private callFn_(name: string, functionName: string, passDevHash?: boolean, functionReturnsHash?: boolean, ...args: (string | number)[])
+	{//Promise<string | number | void | string[] | number[] | Map<string | number, string | number>>
+		const logger = this.logger;
 
-		// N.B.: 'const error = this.#error;' doesn't work for methods referring to 'this'
+		// N.B.: 'const error = this.error;' doesn't work for methods referring to 'this'
 		// themselves: When calling the method via the variable, 'this' inside the method's
 		// body will be undefined since the method wasn't called on 'this'.
 		// Instead, we can use bind() to set the object the method will be called on:
-		const error = this.#error.bind(this);
+		const error = this.error.bind(this);
 
 		logger.info(`callFn: Invoking ${functionName}() of FHEM device ${name} with arguments`, ['<device hash>', ...args]); // Using spread operator to merge arrays
 
-		let useStatement = "use Scalar::Util 'looks_like_number'";
+		const useStatement = "use Scalar::Util 'looks_like_number'";
 		let translateUndefined;
 		let invocation;
-		let processRet = `!defined($ret[0])?'undef':'['.join(',',map(looks_like_number($_)?$_:"'$_'",@ret)).']'`; // Nothing to interpolate, but we don't need to escape quotes.
+		// Nothing to interpolate, but we don't need to escape quotes.
+		// eslint-disable-next-line @typescript-eslint/quotes
+		const processRet = `!defined($ret[0])?'undef':'['.join(',',map(looks_like_number($_)?$_:"'$_'",@ret)).']'`;
 
 		if (args.length)
 		{
 			// Using double quotes for string args since they could contain single quotes.
+			// N.B.: args must be of type '(string | number)[]', not 'string[] | number[]'.
+			//       While the former is an array whose elements can be both strings and numbers,
+			//       the latter is either an array of strings or an array of numbers.
+			//       In the latter case, the map method has a very "funny" signature...
 			const argsStr = args.map(arg => typeof arg === 'number' ? arg : `"${arg}"`).join(',');
 
-			if (argsStr.match('undefined'))
+			if (argsStr.includes('undefined')) // No regex matching needed, it's just a string.
 			{
 				// Replace string "undefined" resulting from passing an undefined arg to this method
 				// with Perl's undef. This can be done in Perl code only.
@@ -300,16 +289,19 @@ class FhemClient
 		const code = translateUndefined ? `${useStatement};;${translateUndefined};;my @ret=${invocation};;${processRet}` : `${useStatement};;my @ret=${invocation};;${processRet}`;
 
 		return this.execPerlCode(code, true).then(
-			ret => // Either 'undef' or an array in JSON, or an FHEM error message.
+			ret => // Either 'undef' or an array in JSON (see 'processRet'), or an FHEM error message.
 			{
 				if (ret === 'undef') return;
 
-				let retArray;
+				let retArray: (string | number)[];
 
 				try
 				{
-					// @ts-ignore
-					retArray = JSON.parse(ret);
+					// ret is an array in JSON, hence a string.
+					// But since TS merely knows it is of type string | number,
+					// we need to use a Type Assertion here to tell TS that
+					// it is a string for sure.
+					retArray = JSON.parse(ret as string);
 				}
 				catch (e) // ret must be an error message from FHEM.
 				{
@@ -320,11 +312,10 @@ class FhemClient
 
 				if (functionReturnsHash)
 				{
-					if (retArray.length % 2 === 0)
+					if (retArray.length % 2 === 0) // Even-sized list => Transform into a Map.
 					{
-						const map = new Map();
+						const map = new Map<string | number, string | number>();
 
-						// @ts-ignore
 						for (let i = 0; i < retArray.length; i += 2) map.set(retArray[i], retArray[i + 1]);
 
 						return map;
@@ -342,102 +333,68 @@ class FhemClient
 
 	/**
 	 * Request FHEMWEB to execute Perl code.
-	 * @param {string} code A string containing valid Perl code. Be sure to use ';;' to separate multiple statements.
-	 * @param {boolean} [calledByCallFn] Used internally.
-	 * @returns {Promise<string | number>} A `Promise` that will be resolved
-	 * with the result in its actual data type on success
-	 * or rejected with one of the following errors.
-	 * @throws {Error} with code 'EFHEMCL_RES' in case of response error (default retry interval: 500 ms).
-	 * @throws {Error} with code 'EFHEMCL_ABRT' in case the response closed prematurely (default retry interval: 500 ms).
-	 * @throws {Error} with code 'EFHEMCL_TIMEDOUT' in case connecting timed out (default retry interval: 10000 ms).
-	 * @throws {Error} with code 'EFHEMCL_CONNREFUSED' in case the connection has been refused (default retry interval: 10000 ms).
-	 * @throws {Error} with code 'EFHEMCL_NETUNREACH' in case the network is unreachable (default retry interval: 10000 ms).
-	 * @throws {Error} with code 'EFHEMCL_CONNRESET' in case the connection has been reset by peer.
-	 * @throws {Error} with code 'EFHEMCL_REQ' in case of a different request error.
-	 * @throws {Error} with code 'EFHEMCL_AUTH' in case of wrong username or password.
-	 * @throws {Error} with code 'EFHEMCL_WEBN' in case of a wrong FHEM 'webname'.
-	 * @throws {Error} with code 'EFHEMCL_NOTOKEN' in case FHEMWEB does use but not send the CSRF Token.
+	 * @param code - A string containing valid Perl code. Be sure to use ';;' to separate multiple statements.
+	 * @param calledByCallFn - (Optional) Used internally.
+	 * @returns A `Promise` that will be resolved with the result in its actual data type on success or rejected with one of the following errors.
+	 * @throws Error with code 'EFHEMCL_RES' in case of response error (default retry interval: 500 ms).
+	 * @throws Error with code 'EFHEMCL_ABRT' in case the response closed prematurely (default retry interval: 500 ms).
+	 * @throws Error with code 'EFHEMCL_TIMEDOUT' in case connecting timed out (default retry interval: 10000 ms).
+	 * @throws Error with code 'EFHEMCL_CONNREFUSED' in case the connection has been refused (default retry interval: 10000 ms).
+	 * @throws Error with code 'EFHEMCL_NETUNREACH' in case the network is unreachable (default retry interval: 10000 ms).
+	 * @throws Error with code 'EFHEMCL_CONNRESET' in case the connection has been reset by peer.
+	 * @throws Error with code 'EFHEMCL_REQ' in case of a different request error.
+	 * @throws Error with code 'EFHEMCL_AUTH' in case of wrong username or password.
+	 * @throws Error with code 'EFHEMCL_WEBN' in case of a wrong FHEM 'webname'.
+	 * @throws Error with code 'EFHEMCL_NOTOKEN' in case FHEMWEB does use but not send the CSRF Token.
 	 */
-	execPerlCode(code, calledByCallFn)
+	execPerlCode(code: string, calledByCallFn?: boolean): Promise<string | number>
 	{
-		return this.#callAndRetry(this.#execPerlCode_, code, calledByCallFn);
+		// 'callAndRetry' calls the provided method via 'apply', so there is no problem.
+		// eslint-disable-next-line @typescript-eslint/unbound-method
+		return this.callAndRetry(this.execPerlCode_, code, calledByCallFn);
 	}
 
-	/**
-	 * @param {string} code
-	 * @param {boolean} [calledByCallFn]
-	 * @returns {Promise<string | number>}
-	 * @throws {Error} with code 'EFHEMCL_RES'
-	 * @throws {Error} with code 'EFHEMCL_ABRT'
-	 * @throws {Error} with code 'EFHEMCL_TIMEDOUT'
-	 * @throws {Error} with code 'EFHEMCL_CONNREFUSED'
-	 * @throws {Error} with code 'EFHEMCL_NETUNREACH'
-	 * @throws {Error} with code 'EFHEMCL_CONNRESET'
-	 * @throws {Error} with code 'EFHEMCL_REQ'
-	 * @throws {Error} with code 'EFHEMCL_AUTH'
-	 * @throws {Error} with code 'EFHEMCL_WEBN'
-	 * @throws {Error} with code 'EFHEMCL_NOTOKEN'
-	 * @private
-	 * @ignore
-	 */
-	#execPerlCode_ = (code, calledByCallFn) =>
+	private execPerlCode_ (code: string, calledByCallFn?: boolean): Promise<string | number>
 	{
 		return this.execCmd(`{ ${code} }`, calledByCallFn);
 	}
 
 	/**
 	 * Request FHEMWEB to execute a FHEM command.
-	 * @param {string} cmd The FHEM command to execute
-	 * @param {boolean} [calledByCallFn] Used internally.
-	 * @returns {Promise<string | number>} A `Promise` that will be resolved
-	 * with the result in its actual data type on success
-	 * or rejected with one of the following errors.
-	 * @throws {Error} with code 'EFHEMCL_RES' in case of response error (default retry interval: 500 ms).
-	 * @throws {Error} with code 'EFHEMCL_ABRT' in case the response closed prematurely (default retry interval: 500 ms).
-	 * @throws {Error} with code 'EFHEMCL_TIMEDOUT' in case connecting timed out (default retry interval: 10000 ms).
-	 * @throws {Error} with code 'EFHEMCL_CONNREFUSED' in case the connection has been refused (default retry interval: 10000 ms).
-	 * @throws {Error} with code 'EFHEMCL_NETUNREACH' in case the network is unreachable (default retry interval: 10000 ms).
-	 * @throws {Error} with code 'EFHEMCL_CONNRESET' in case the connection has been reset by peer.
-	 * @throws {Error} with code 'EFHEMCL_REQ' in case of a different request error.
-	 * @throws {Error} with code 'EFHEMCL_AUTH' in case of wrong username or password.
-	 * @throws {Error} with code 'EFHEMCL_WEBN' in case of a wrong FHEM 'webname'.
-	 * @throws {Error} with code 'EFHEMCL_NOTOKEN' in case FHEMWEB does use but not send the CSRF Token.
+	 * @param cmd - The FHEM command to execute
+	 * @param calledByCallFn - (Optional) Used internally.
+	 * @returns A `Promise` that will be resolved with the result in its actual data type on success or rejected with one of the following errors.
+	 * @throws Error with code 'EFHEMCL_RES' in case of response error (default retry interval: 500 ms).
+	 * @throws Error with code 'EFHEMCL_ABRT' in case the response closed prematurely (default retry interval: 500 ms).
+	 * @throws Error with code 'EFHEMCL_TIMEDOUT' in case connecting timed out (default retry interval: 10000 ms).
+	 * @throws Error with code 'EFHEMCL_CONNREFUSED' in case the connection has been refused (default retry interval: 10000 ms).
+	 * @throws Error with code 'EFHEMCL_NETUNREACH' in case the network is unreachable (default retry interval: 10000 ms).
+	 * @throws Error with code 'EFHEMCL_CONNRESET' in case the connection has been reset by peer.
+	 * @throws Error with code 'EFHEMCL_REQ' in case of a different request error.
+	 * @throws Error with code 'EFHEMCL_AUTH' in case of wrong username or password.
+	 * @throws Error with code 'EFHEMCL_WEBN' in case of a wrong FHEM 'webname'.
+	 * @throws Error with code 'EFHEMCL_NOTOKEN' in case FHEMWEB does use but not send the CSRF Token.
 	 */
-	execCmd(cmd, calledByCallFn)
+	execCmd(cmd: string, calledByCallFn?: boolean): Promise<string | number>
 	{
-		return this.#callAndRetry(this.#execCmd_, cmd, calledByCallFn);
+		// 'callAndRetry' calls the provided method via 'apply', so there is no problem.
+		// eslint-disable-next-line @typescript-eslint/unbound-method
+		return this.callAndRetry(this.execCmd_, cmd, calledByCallFn);
 	}
 
-	/**
-	 * @param {string} cmd
-	 * @param {boolean} [calledByCallFn]
-	 * @returns {Promise<string | number>}
-	 * @throws {Error} with code 'EFHEMCL_RES'
-	 * @throws {Error} with code 'EFHEMCL_ABRT'
-	 * @throws {Error} with code 'EFHEMCL_TIMEDOUT'
-	 * @throws {Error} with code 'EFHEMCL_CONNREFUSED'
-	 * @throws {Error} with code 'EFHEMCL_NETUNREACH'
-	 * @throws {Error} with code 'EFHEMCL_CONNRESET'
-	 * @throws {Error} with code 'EFHEMCL_REQ'
-	 * @throws {Error} with code 'EFHEMCL_AUTH'
-	 * @throws {Error} with code 'EFHEMCL_WEBN'
-	 * @throws {Error} with code 'EFHEMCL_NOTOKEN'
-	 * @private
-	 * @ignore
-	 */
-	#execCmd_ = (cmd, calledByCallFn) =>
+	private execCmd_(cmd: string, calledByCallFn?: boolean): Promise<string | number>
 	{
-		const logger = this.#logger;
-		const url    = this.#url;
-		const error  = this.#error.bind(this);
+		const logger = this.logger;
+		const url    = this.url;
+		const error  = this.error.bind(this);
 
 		// No token => Obtain it and call this method again.
-		if (!url.searchParams.get('fwcsrf')) return this.#obtainCsrfToken().then(
+		if (!url.searchParams.get('fwcsrf')) return this.obtainCsrfToken().then(
 			token =>
 			{
 				if (token) url.searchParams.set('fwcsrf', token);
 
-				return this.#execCmd_(cmd, calledByCallFn);
+				return this.execCmd_(cmd, calledByCallFn);
 			}
 		);
 
@@ -447,7 +404,7 @@ class FhemClient
 
 		let body = '';
 
-		return this.#getWithPromise(
+		return this.getWithPromise(
 			(res, resolve, reject) =>
 			{
 				switch (res.statusCode)
@@ -475,8 +432,10 @@ class FhemClient
 						{
 							logger.debug('execCmd: CSRF token no longer valid, updating token and reissuing request.');
 
-							// @ts-ignore
-							url.searchParams.set('fwcsrf', res.headers['x-fhem-csrftoken']);
+							// N.B.: The elements of res.headers['foo'] are of type string[].
+							//       But since we know that the CSRF token is a string,
+							//       we use a Type Assertion here.
+							url.searchParams.set('fwcsrf', res.headers['x-fhem-csrftoken'] as string);
 
 							this.execCmd(cmd).then(
 								body => resolve(body),
@@ -490,7 +449,7 @@ class FhemClient
 
 						break;
 					default:
-						this.#handleStatusCode(res, `execCmd: Failed to execute FHEM command '${cmd}'`, reject);
+						this.handleStatusCode(res, `execCmd: Failed to execute FHEM command '${cmd}'`, reject);
 				}
 			}
 		);
@@ -498,26 +457,24 @@ class FhemClient
 
 	/**
 	 * Obtains the CSRF token, if any, from FHEMWEB without causing a "FHEMWEB WEB CSRF error".
-	 * @returns {Promise<string>} A `Promise` that will be resolved
+	 * @returns A `Promise` that will be resolved
 	 * with the token or an empty string on success
 	 * or rejected with one of the following errors.
-	 * @throws {Error} with code 'EFHEMCL_RES' in case of response error.
-	 * @throws {Error} with code 'EFHEMCL_ABRT' in case the response closed prematurely.
-	 * @throws {Error} with code 'EFHEMCL_TIMEDOUT' in case connecting timed out.
-	 * @throws {Error} with code 'EFHEMCL_CONNREFUSED' in case the connection has been refused.
-	 * @throws {Error} with code 'EFHEMCL_NETUNREACH' in case the network is unreachable.
-	 * @throws {Error} with code 'EFHEMCL_CONNRESET' in case the connection has been reset by peer.
-	 * @throws {Error} with code 'EFHEMCL_REQ' in case of a different request error.
-	 * @throws {Error} with code 'EFHEMCL_AUTH' in case of wrong username or password.
-	 * @throws {Error} with code 'EFHEMCL_WEBN' in case of a wrong FHEM 'webname'.
-	 * @private
-	 * @ignore
+	 * @throws Error with code 'EFHEMCL_RES' in case of response error.
+	 * @throws Error with code 'EFHEMCL_ABRT' in case the response closed prematurely.
+	 * @throws Error with code 'EFHEMCL_TIMEDOUT' in case connecting timed out.
+	 * @throws Error with code 'EFHEMCL_CONNREFUSED' in case the connection has been refused.
+	 * @throws Error with code 'EFHEMCL_NETUNREACH' in case the network is unreachable.
+	 * @throws Error with code 'EFHEMCL_CONNRESET' in case the connection has been reset by peer.
+	 * @throws Error with code 'EFHEMCL_REQ' in case of a different request error.
+	 * @throws Error with code 'EFHEMCL_AUTH' in case of wrong username or password.
+	 * @throws Error with code 'EFHEMCL_WEBN' in case of a wrong FHEM 'webname'.
 	 */
-	#obtainCsrfToken = () =>
+	private obtainCsrfToken(): Promise<string>
 	{
-		const logger = this.#logger;
+		const logger = this.logger;
 
-		return this.#getWithPromise(
+		return this.getWithPromise(
 			(res, resolve, reject) =>
 			{
 				let token = res.headers['x-fhem-csrftoken'];
@@ -536,24 +493,23 @@ class FhemClient
 
 						break;
 					default:
-						this.#handleStatusCode(res, 'execCmd: Failed to get CSRF token', reject);
+						this.handleStatusCode(res, 'execCmd: Failed to get CSRF token', reject);
 				}
 			}
 		);
 	}
 
 	/**
-	 * Used by `execCmd` and `obtainCsrfToken' for status codes
+	 * Used by `execCmd` and `obtainCsrfToken` for status codes
 	 * which can be handled in a common way.
-	 * @param {http.IncomingMessage} res
-	 * @param {string} messagePrefix
-	 * @param {(reason?: any) => void} reject
-	 * @private
-	 * @ignore
+	 * @param res - The server response object.
+	 * @param messagePrefix - Prefix for error message.
+	 * @param reject - The function to reject the `Promise`.
 	 */
-	#handleStatusCode = (res, messagePrefix, reject) =>
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	private handleStatusCode(res: http.IncomingMessage, messagePrefix: string, reject: (reason?: any) => void)
 	{
-		const error = this.#error.bind(this);
+		const error = this.error.bind(this);
 
 		switch (res.statusCode)
 		{
@@ -562,7 +518,7 @@ class FhemClient
 
 				break;
 			case 302: // Found => Wrong webname
-				error(`${messagePrefix}: Wrong FHEM 'webname' in ${this.#fhemOptions.url}.`, 'WEBN', reject);
+				error(`${messagePrefix}: Wrong FHEM 'webname' in ${this.fhemOptions.url}.`, 'WEBN', reject);
 
 				break;
 			default:
@@ -571,40 +527,38 @@ class FhemClient
 	}
 
 	/**
-	 * Wraps a call to `this.#client.get()` in a `Promise`.
-	 * @param {(res: http.IncomingMessage, resolve: (value?: any) => void, reject: (reason?: any) => void) => void} processResponse
-	 * Handler that will be called on server response with the response object,
+	 * Wraps a call to `this.client.get()` in a `Promise`.
+	 * @param processResponse -
+	 * A callback that will be called on server response with the response object,
 	 * as well as the two functions to resolve or reject the `Promise`.
-	 * @returns {Promise<any>} A `Promise` that will be resolved by `processResponse` on success
+	 * @returns A `Promise` that will be resolved by `processResponse` on success.
 	 * or rejected by `processResponse`, the request listener or the response listener
 	 * with one of the following errors.
-	 * @throws {Error} with code 'EFHEMCL_RES' in case of response error.
-	 * @throws {Error} with code 'EFHEMCL_ABRT' in case the response closed prematurely.
-	 * @throws {Error} with code 'EFHEMCL_TIMEDOUT' in case connecting timed out.
-	 * @throws {Error} with code 'EFHEMCL_CONNREFUSED' in case the connection has been refused.
-	 * @throws {Error} with code 'EFHEMCL_NETUNREACH' in case the network is unreachable.
-	 * @throws {Error} with code 'EFHEMCL_CONNRESET' in case the connection has been reset by peer.
-	 * @throws {Error} with code 'EFHEMCL_REQ' in case of a different request error.
-	 * @private
-	 * @ignore
+	 * @throws `Error` with code 'EFHEMCL_RES' in case of response error.
+	 * @throws `Error` with code 'EFHEMCL_ABRT' in case the response closed prematurely.
+	 * @throws `Error` with code 'EFHEMCL_TIMEDOUT' in case connecting timed out.
+	 * @throws `Error` with code 'EFHEMCL_CONNREFUSED' in case the connection has been refused.
+	 * @throws `Error` with code 'EFHEMCL_NETUNREACH' in case the network is unreachable.
+	 * @throws `Error` with code 'EFHEMCL_CONNRESET' in case the connection has been reset by peer.
+	 * @throws `Error` with code 'EFHEMCL_REQ' in case of a different request error.
 	 */
-	#getWithPromise = (processResponse) =>
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	private getWithPromise(processResponse: (res: http.IncomingMessage, resolve: (value?: any) => void, reject: (reason?: any) => void) => void): Promise<any>
 	{
-		const logger = this.#logger;
-		const error  = this.#error.bind(this);
+		const logger = this.logger;
+		const error  = this.error.bind(this);
 
 		return new Promise(
 			(resolve, reject) =>
 			{
-				const req = this.#client.get(this.#url, this.#getOptions,
+				const req = this.client.get(this.url, this.getOptions,
 					res =>
 					{
 						// Remove 'timeout' listener as soon as we receive a response.
 						req.removeAllListeners('timeout');
 
 						res.on('error',
-							// @ts-ignore
-							e => error(`execCmd: Response error: Code: ${e.code}, message: ${e.message}`, 'RES', reject)
+							e => error(`execCmd: Response error: Code: ${e['code']}, message: ${e.message}`, 'RES', reject)
 						);
 
 						res.on('aborted',
@@ -618,40 +572,37 @@ class FhemClient
 				).on('error',
 					e =>
 					{
-						// @ts-ignore
-						logger.debug(`execCmd: Request error: Code: ${e.code}, message: ${e.message}`);
+						logger.debug(`execCmd: Request error: Code: ${e['code']}, message: ${e.message}`);
 
-						// @ts-ignore
-						switch (e.code)
+						switch (e['code'])
 						{
 							case 'ETIMEDOUT': // This has nothing to do with 'timeout' option. There is a built-in timeout, but that's pretty long.
-								error(`execCmd: Connecting to ${this.#fhemOptions.url} timed out.`, 'TIMEDOUT', reject);
+								error(`execCmd: Connecting to ${this.fhemOptions.url} timed out.`, 'TIMEDOUT', reject);
 								break;
 							case 'ECONNREFUSED':
-								error(`execCmd: Connection to ${this.#fhemOptions.url} refused.`, 'CONNREFUSED', reject);
+								error(`execCmd: Connection to ${this.fhemOptions.url} refused.`, 'CONNREFUSED', reject);
 								break;
 							case 'ENETUNREACH':
-								error(`execCmd: Cannot connect to ${this.#fhemOptions.url}: Network is unreachable.`, 'NETUNREACH', reject);
+								error(`execCmd: Cannot connect to ${this.fhemOptions.url}: Network is unreachable.`, 'NETUNREACH', reject);
 								break;
 							case 'ECONNRESET':
 								if (this.reqAborted)
 								{
 									this.reqAborted = false;
-									error(`execCmd: Connecting to ${this.#fhemOptions.url} timed out.`, 'TIMEDOUT', reject);
+									error(`execCmd: Connecting to ${this.fhemOptions.url} timed out.`, 'TIMEDOUT', reject);
 									break;
 								}
 
-								error(`execCmd: Connection reset by ${this.#url.host}. Check if '${this.#url.protocol}' is the right protocol.`, 'CONNRESET', reject);
+								error(`execCmd: Connection reset by ${this.url.host}. Check if '${this.url.protocol}' is the right protocol.`, 'CONNRESET', reject);
 								break;
 							default:
-								// @ts-ignore
-								error(`execCmd: Request failed: Code: ${e.code}, message: ${e.message}`, 'REQ', reject);
+								error(`execCmd: Request failed: Code: ${e['code']}, message: ${e.message}`, 'REQ', reject);
 							}
 					}
 				).on('timeout',
 					() =>
 					{
-						// N.B.: Setting RequestOptions.timeout merely generates this event when the specified time has elapsed,
+						// N.B.: Setting RequestOptions.timeout merely generates this event when the specified time has elapsed;
 						// the request must be aborted manually.
 						// Furthermore, this event is emitted even after the response has been received. In this case, aborting
 						// the request would not harm, but setting the flag below would result in the next actual ECONNRESET being
@@ -672,60 +623,57 @@ class FhemClient
 
 	/**
 	 * Logs `message` as error, constructs an `Error` object with `message`
-	 * and sets its `code` property to 'EFHEMCL_codeSuff'.
+	 * and sets its `code` property to 'EFHEMCL_<codeSuff>'.
 	 * Then, if `reject` function supplied, it is called with the `Error` object;
 	 * otherwise, the `Error` is thrown.
-	 * @param {string} message
-	 * @param {string} codeSuff
-	 * @param {(reason?: any) => void} [reject]
-	 * @private
-	 * @ignore
+	 * @param message - The error message.
+	 * @param codeSuff - `string` string to be appended to 'EFHEMCL_' to form the error code.
+	 * @param reject - (Optional) The function to reject the `Promise`.
 	 */
-	#error = (message, codeSuff, reject) =>
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	private error(message: string, codeSuff: string, reject?: (reason?: any) => void)
 	{
-		this.#logger.error(message);
+		this.logger.error(message);
 
 		const e = new Error(message);
-		// @ts-ignore
-		e.code = `EFHEMCL_${codeSuff}`;
+		e['code'] = `EFHEMCL_${codeSuff}`;
 
 		if (reject) reject(e);
 		else throw e;
 	}
 
 	/**
-	 * Invokes `method` on this with `args`.
+	 * Invokes `method` on `this` with `args`.
 	 * On error, if `expirationPeriod` property has been set to a positive value
 	 * and we have a positive retry interval for the respective error code, the method
 	 * will be invoked again after the specified time until it returns without error
 	 * or `expirationPeriod` is exceeded.
 	 * If the latter occurs, the last error will be thrown.
-	 * @param {(...args: any[]) => Promise<any>} method Instance method to be invoked.
-	 * @param {...any} args Arguments for `method`.
-	 * @private
-	 * @ignore
+	 * @param method - Instance method to be invoked.
+	 * @param args - Arguments for `method`.
 	 */
-	#callAndRetry = async (method, ...args) =>
+	private async callAndRetry (method: (...args: any[]) => Promise<any>, ...args: any[])
 	{
 		const expirationTime = this.expirationPeriod > 0 ? Date.now() + this.expirationPeriod : undefined;
-		let retryInterval;
-		let retry;
+		let retryInterval: number;
+		let retry = false;
 		let result;
 
-		while (true)
+		do
 		{
-			retry = false;
-
+			// 'apply' is similar to 'bind', but instead of returning a bound function
+			// that can be called later on, it calls the function immediately and returns
+			// the result.
 			result = await method.apply(this, args).catch(
 				e =>
 				{
-					if (expirationTime && this.#retryIntervalFromCode.has(e.code))
+					if (expirationTime && this.retryIntervalFromCode.has(e.code))
 					{
-						retryInterval = this.#retryIntervalFromCode.get(e.code);
+						retryInterval = this.retryIntervalFromCode.get(e.code);
 
 						if (retryInterval > 0 && Date.now() + retryInterval < expirationTime) // Request must not expire before actually being sent.
 						{
-							this.#logger.info(`Retrying in ${retryInterval} ms...`);
+							this.logger.info(`Retrying in ${retryInterval} ms...`);
 
 							retry = true;
 						}
@@ -738,7 +686,8 @@ class FhemClient
 			if (retry) await sleep(retryInterval);
 			else return result;
 		}
+		while (retry);
 	}
 }
 
-module.exports = FhemClient;
+export = FhemClient;
