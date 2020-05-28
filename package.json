@@ -24,7 +24,7 @@
 		"lint": "eslint --ext .ts src"
 	},
 	"devDependencies": {
-		"@microsoft/api-extractor": "^7.8.7",
+		"@microsoft/api-extractor": "^7.8.8",
 		"@types/node": "^12.12.42",
 		"@typescript-eslint/eslint-plugin": "^2.34.0",
 		"@typescript-eslint/parser": "^2.34.0",
