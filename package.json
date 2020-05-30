@@ -18,18 +18,26 @@
 		"Client",
 		"FHEM"
 	],
+	"config": {
+		"rootDir": "src",
+		"outDir": "lib"
+	},
 	"scripts": {
-		"compile": "tsc -p ./",
-		"watch": "tsc -watch -p ./",
-		"lint": "eslint --ext .ts src"
+		"generateJs": "tsc -p ./ --rootDir \"$npm_package_config_rootDir\" --outDir \"$npm_package_config_outDir\" --removeComments true --declaration false --declarationMap false",
+		"generateDts": "tsc -p ./ --rootDir \"$npm_package_config_rootDir\" --outDir \"$npm_package_config_outDir\" --emitDeclarationOnly true",
+		"compile": "rm \"$npm_package_config_outDir\"/* && npm run generateJs && npm run generateDts && npm run generateDoc",
+		"watch": "tsc --watch -p ./ --noEmitOnError false",
+		"lint": "eslint --ext .ts src",
+		"generateDoc": "typedoc --options typedoc.js"
 	},
 	"devDependencies": {
-		"@microsoft/api-extractor": "^7.8.8",
 		"@types/node": "^12.12.42",
 		"@typescript-eslint/eslint-plugin": "^2.34.0",
 		"@typescript-eslint/parser": "^2.34.0",
 		"eslint": "^6.8.0",
 		"eslint-plugin-tsdoc": "^0.2.5",
+		"typedoc": "^0.17.7",
+		"typedoc-plugin-markdown": "^2.2.17",
 		"typescript": "^3.9.3"
 	}
 }
