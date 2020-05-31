@@ -9,6 +9,7 @@
 		"declarationMap": true,
 		"baseUrl": "./",
 		"noEmitOnError": true,
-		"listEmittedFiles": true
+		"listEmittedFiles": true,
+		"stripInternal": true
     }
 }
