@@ -1,10 +1,15 @@
 module.exports =
 {
-	inputFiles: 'src',
 	mode: 'modules',
+	toc: [
+		'FhemClient'
+	],
 	out: 'doc',
 	listInvalidSymbolLinks: true,
 	excludePrivate: true,
+	excludeProtected: true,
+	stripInternal: true,
 	disableSources: true,
-	readme: 'none'
+	readme: 'none',
+	includeVersion: true
 };
