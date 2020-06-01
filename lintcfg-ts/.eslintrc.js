@@ -26,6 +26,13 @@ module.exports = {
 		"plugin:@typescript-eslint/recommended",
 		"plugin:@typescript-eslint/recommended-requiring-type-checking"
 	],
+	// This fixes
+	//   'Parsing error: "parserOptions.project" has been set for @typescript-eslint/parser.
+	//   The file does not match your project config: .eslintrc.js.
+	//   The file must be included in at least one of the projects provided.'
+	"ignorePatterns": [
+		".eslintrc.js"
+	],
 	"rules": {
 		/// Additionally enabled (N.B.: The corresponding base rules must be disabled)
 		"no-extra-parens": "off",
@@ -41,9 +48,6 @@ module.exports = {
 		"@typescript-eslint/quotes": ["warn", "single", { "avoidEscape": true }],
 		/// Adjustments
 		"@typescript-eslint/no-use-before-define": ["error", "nofunc"], // Functions are hoisted
-
-		"camelcase": "off",
-    	"@typescript-eslint/camelcase": ["warn", { "properties": "always", "genericType": "always" }],
 		/// Disabled
 		// Annoying to get this warning even if the return type is inferred.
 		"@typescript-eslint/explicit-function-return-type": "off",
@@ -56,5 +60,6 @@ module.exports = {
 
 		/// eslint-plugin-tsdoc
 		"tsdoc/syntax": "warn"
-	}
+	},
+	"reportUnusedDisableDirectives": true
 };
