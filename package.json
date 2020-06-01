@@ -25,10 +25,10 @@
 	"scripts": {
 		"generateJs": "tsc -p ./ --rootDir \"$npm_package_config_rootDir\" --outDir \"$npm_package_config_outDir\" --removeComments true --declaration false --declarationMap false",
 		"generateDts": "tsc -p ./ --rootDir \"$npm_package_config_rootDir\" --outDir \"$npm_package_config_outDir\" --emitDeclarationOnly true",
-		"compile": "rm \"$npm_package_config_outDir\"/* && npm run generateJs && npm run generateDts && npm run generateDoc",
+		"compile": "rm -f \"$npm_package_config_outDir\"/* && npm run generateDoc && npm run generateJs && npm run generateDts",
 		"watch": "tsc --watch -p ./ --noEmitOnError false",
-		"lint": "eslint --ext .ts src",
-		"generateDoc": "typedoc --options typedoc.js"
+		"lint": "eslint --ext .ts \"$npm_package_config_rootDir\"",
+		"generateDoc": "typedoc --options typedoc.js --inputFiles \"$npm_package_config_rootDir\""
 	},
 	"devDependencies": {
 		"@types/node": "^12.12.42",
