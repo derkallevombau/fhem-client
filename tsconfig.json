@@ -10,6 +10,12 @@
 		"baseUrl": "./",
 		"noEmitOnError": true,
 		"listEmittedFiles": true,
-		"stripInternal": true
+		"stripInternal": true,
+		// Very useful in conjunction with new rule '@typescript-eslint/no-unsafe-assignment':
+		// bind, call and apply get type params, so instead of e. g.
+		// 'apply(this: Function, thisArg: any, argArray?: any): any;', we have
+		// 'apply<T, A extends any[], R>(this: (this: T, ...args: A) => R, thisArg: T, args: A): R;'.
+		// Type params are always a good thing, and we have no 'any' anymore that ESLint complains about.
+		"strictBindCallApply": true
     }
 }
