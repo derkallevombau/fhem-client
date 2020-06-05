@@ -25,19 +25,19 @@
 	"scripts": {
 		"generateJs": "tsc -p ./ --rootDir \"$npm_package_config_rootDir\" --outDir \"$npm_package_config_outDir\" --removeComments true --declaration false --declarationMap false",
 		"generateDts": "tsc -p ./ --rootDir \"$npm_package_config_rootDir\" --outDir \"$npm_package_config_outDir\" --emitDeclarationOnly true",
-		"compile": "rm -f \"$npm_package_config_outDir\"/* && npm run generateDoc && npm run generateJs && npm run generateDts",
+		"compile": "npm run generateJs && npm run generateDts && npm run generateDoc",
 		"watch": "tsc --watch -p ./ --noEmitOnError false",
 		"lint": "eslint --ext .ts \"$npm_package_config_rootDir\"",
 		"generateDoc": "typedoc --options typedoc.js --inputFiles \"$npm_package_config_rootDir\""
 	},
 	"devDependencies": {
-		"@types/node": "^12.12.42",
-		"@typescript-eslint/eslint-plugin": "^3.0.0",
-		"@typescript-eslint/parser": "^3.0.0",
+		"@types/node": "^12.12.44",
+		"@typescript-eslint/eslint-plugin": "^3.1.0",
+		"@typescript-eslint/parser": "^3.1.0",
 		"eslint": "^7.0.0",
 		"eslint-plugin-tsdoc": "^0.2.5",
 		"typedoc": "^0.17.7",
-		"typedoc-plugin-markdown": "^2.2.17",
-		"typescript": "^3.9.3"
+		"typedoc-plugin-markdown": "^2.3.1",
+		"typescript": "^3.9.5"
 	}
 }
