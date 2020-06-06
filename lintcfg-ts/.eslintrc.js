@@ -30,8 +30,10 @@ module.exports = {
 	//   'Parsing error: "parserOptions.project" has been set for @typescript-eslint/parser.
 	//   The file does not match your project config: .eslintrc.js.
 	//   The file must be included in at least one of the projects provided.'
+	//   And the same for typedoc.js.
 	"ignorePatterns": [
-		".eslintrc.js"
+		".eslintrc.js",
+		"typedoc.js"
 	],
 	"rules": {
 		/// Additionally enabled (N.B.: The corresponding base rules must be disabled)
