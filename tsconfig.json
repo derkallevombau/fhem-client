@@ -3,12 +3,18 @@
     "compilerOptions": {
         "module": "CommonJS",
         "target": "ES2020",
-        "lib": ["ES2020"],
+		"lib": ["ES2020"],
+		// Enables the generation of sourcemap files (.js.map) for .js output files. These files allow debuggers
+		// and other tools to display the original TypeScript source code when actually working with the emitted
+		// JavaScript files.
         "sourceMap": true,
-		"pretty": true,
 		"declaration": true,
+		// Generates a source map (.d.ts.map) for .d.ts files which map back to the original .ts source file.
+		// This will allow editors such as VS Code to go to the original .ts file when using features
+		// like Go to Definition.
 		"declarationMap": true,
 		"baseUrl": "./",
+		"pretty": true,
 		"noEmitOnError": true,
 		"listEmittedFiles": true,
 		"stripInternal": true,
