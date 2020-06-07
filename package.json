@@ -16,7 +16,7 @@
 	"bugs": {
 		"url": "https://github.com/derkallevombau/fhem-client/issues"
 	},
-	"homepage": "https://github.com/derkallevombau/fhem-client#readme",
+	"homepage": "https://derkallevombau.github.io/fhem-client/",
 	"keywords": [
 		"Client",
 		"FHEM"
