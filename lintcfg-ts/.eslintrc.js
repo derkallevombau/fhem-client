@@ -33,8 +33,7 @@ module.exports = {
 	//   The file must be included in at least one of the projects provided.'
 	//   And the same for typedoc.js.
 	"ignorePatterns": [
-		".eslintrc.js",
-		"typedoc.js"
+		"**/*.js"
 	],
 	"rules": {
 		/// Additionally enabled (N.B.: The corresponding base rules must be disabled)
