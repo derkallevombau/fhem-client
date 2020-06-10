@@ -513,7 +513,7 @@ class FhemClient
 					case 400: // No or invalid CSRF token when requesting execution of 'cmd'
 						if (url.searchParams.has('fwcsrf'))
 						{
-							logger.debug('execCmd: CSRF token no longer valid, updating token and reissuing request.');
+							logger.info('execCmd: CSRF token no longer valid, updating token and reissuing request.');
 
 							// Update token...
 							// N.B.: The elements of res.headers['foo'] are of type string[].
@@ -575,7 +575,7 @@ class FhemClient
 						logger.warn('execCmd: Got 400 when obtaining CSRF token. This should not happen!');
 					// eslint-disable-next-line no-fallthrough
 					case 200: // A GET request with correct authentication and without 'cmd' and 'fwcsrf' params gives no error.
-						if (token) logger.debug('execCmd: Obtained CSRF token');
+						if (token) logger.info('execCmd: Obtained CSRF token');
 						else logger.warn("execCmd: No CSRF token received. Either this FHEMWEB doesn't use it, or it doesn't send it. We will see...");
 
 						resolve(token);
@@ -650,7 +650,7 @@ class FhemClient
 						).on('aborted',
 							() => error('execCmd: Response closed prematurely.', 'ABRT', reject)
 						).on('close',
-							() => logger.debug('execCmd: Connection closed.')
+							() => logger.info('execCmd: Connection closed.')
 						);
 
 						processResponse(res, resolve, reject);
@@ -659,8 +659,6 @@ class FhemClient
 					e =>
 					{
 						const code = getErrorCode(e);
-
-						logger.debug(`execCmd: Request error: Code: ${code}, message: ${e.message}`);
 
 						switch (code)
 						{
@@ -685,7 +683,7 @@ class FhemClient
 								break;
 							default:
 								error(`execCmd: Request failed: Code: ${code}, message: ${e.message}`, 'REQ', reject);
-							}
+						}
 					}
 				).on('timeout',
 					() =>
@@ -697,7 +695,7 @@ class FhemClient
 						// incorrectly treated as ETIMEOUT. Thus, we remove this listener as soon as we receive a response.
 						// This event will not be emitted after the 'error' event has been emitted.
 
-						logger.debug('Aborting request because timeout value set by user exceeded.');
+						logger.info('Aborting request because timeout value set by user exceeded.');
 
 						// Aborting the request results in ECONNRESET, not what the user would expect on a timeout...
 						// Thus, we set a flag that causes next ECONNRESET to be treated as ETIMEDOUT.
