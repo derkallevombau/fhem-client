@@ -1,5 +1,17 @@
 /// <reference types="node" />
 import * as https from 'https';
+/** @ignore */
+declare type LogMethod = (level: string, ...args: any[]) => void;
+/** @ignore */
+declare type LoggerLevelMethod = (message: any, ...args: any[]) => void;
+/** @ignore */
+interface Logger {
+    log: LogMethod;
+    debug: LoggerLevelMethod;
+    info: LoggerLevelMethod;
+    warn: LoggerLevelMethod;
+    error: LoggerLevelMethod;
+}
 interface FhemOptions {
     /**
      * The URL of the desired FHEMWEB instance: 'http[s]://&lt;host&gt;:&lt;port&gt;/webname'.

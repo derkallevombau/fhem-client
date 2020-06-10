@@ -69,15 +69,15 @@
 import * as http from 'http';
 import * as https from 'https';
 import { URL } from 'url';
-/** @internal */ // Listed as variable by typedoc.
+/** @ignore */ // Listed as variable by typedoc.
 import assert = require('assert');
 
-/** @internal */
+/** @ignore */
 type LogMethod = (level: string, ...args: any[]) => void;
-/** @internal */
+/** @ignore */
 type LoggerLevelMethod = (message: any, ...args: any[]) => void;
 
-/** @internal */
+/** @ignore */
 interface Logger
 {
 	log  : LogMethod;
