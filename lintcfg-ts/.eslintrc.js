@@ -8,10 +8,11 @@ module.exports = {
 	"parserOptions": {
 		/// Core parser options
 		"ecmaVersion": 2020,
-		// For a module, place a .eslintrc.js in src with contents
-		// 'module.exports = { "parserOptions": { "sourceType": "module" } };'
+		// For a script, place a .eslintrc.js in its dir with contents
+		// 'module.exports = { "parserOptions": { "sourceType": "script" } };'
 		// to override this option.
-		"sourceType": "script",
+		// A file that imports or exports sth. is a module, otherwise it's a script.
+		"sourceType": "module",
 		/// Options for @typescript-eslint/parser
 		"tsconfigRootDir": `__dirname/..`,
 		"project": "tsconfig.json"
