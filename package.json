@@ -23,7 +23,8 @@
 	],
 	"config": {
 		"rootDir": "src",
-		"outDir": "lib"
+		"outDir": "lib",
+		"lintCfgSubtreeRepoBasePath": "~/VS-Code-Projects/linter-configs/"
 	},
 	"scripts": {
 		"generateJs": "tsc -p ./ --rootDir \"$npm_package_config_rootDir\" --outDir \"$npm_package_config_outDir\" --removeComments true --declaration false --declarationMap false",
@@ -31,12 +32,15 @@
 		"compile": "npm run generateJs && npm run generateDts && npm run generateDoc",
 		"watch": "tsc --watch -p ./ --noEmitOnError false",
 		"lint": "eslint --ext .ts \"$npm_package_config_rootDir\"",
-		"generateDoc": "typedoc --options typedoc.js --inputFiles \"$npm_package_config_rootDir\""
+		"generateDoc": "typedoc --options typedoc.js --inputFiles \"$npm_package_config_rootDir\"",
+		"lintCfgTsAdd": "git subtree add -P lintcfg-ts --squash \"$npm_package_config_lintCfgSubtreeRepoBasePath\"ts master && ln -s {lintcfg-ts/,}.eslintrc.js",
+		"lintCfgTsPush": "git subtree push -P lintcfg-ts \"$npm_package_config_lintCfgSubtreeRepoBasePath\"ts master",
+		"lintCfgTsPull": "git subtree pull -P lintcfg-ts --squash \"$npm_package_config_lintCfgSubtreeRepoBasePath\"ts master"
 	},
 	"devDependencies": {
-		"@types/node": "^12.12.44",
-		"@typescript-eslint/eslint-plugin": "^3.1.0",
-		"@typescript-eslint/parser": "^3.1.0",
+		"@types/node": "^12.12.47",
+		"@typescript-eslint/eslint-plugin": "^3.2.0",
+		"@typescript-eslint/parser": "^3.2.0",
 		"eslint": "^7.2.0",
 		"eslint-plugin-tsdoc": "^0.2.5",
 		"typedoc": "^0.17.7",
