@@ -60,20 +60,6 @@ interface Options extends FhemOptions {
 }
 declare class FhemClient {
     /**
-     * FHEM URL, username and password.
-     */
-    private fhemOptions;
-    private getOptions;
-    private retryIntervalFromCode;
-    private logger;
-    private url;
-    private client;
-    /**
-     * Flag indicating whether we aborted the current request
-     * because it timed out.
-     */
-    private reqAborted;
-    /**
      * Time in millis after which to discard a failed request.
      * See property {@linkcode Options.retryIntervals} of `options` param of {@linkcode FhemClient.constructor}.
      */
@@ -125,10 +111,6 @@ declare class FhemClient {
      */
     callFn(name: string, functionName: string, passDevHash?: boolean, functionReturnsHash?: boolean, ...args: (string | number)[]): Promise<string | number | void | (string | number)[] | Map<string | number, string | number>>;
     /**
-     * Actual 'callFn' before implementing retry feature.
-     */
-    private callFn_;
-    /**
      * Request FHEMWEB to execute Perl code.
      * @param code - A string containing valid Perl code. Be sure to use ';;' to separate multiple statements.
      * @returns A `Promise` that will be resolved with the result in its actual data type on success or rejected with one of the following errors.
@@ -144,8 +126,6 @@ declare class FhemClient {
      * @throws `Error` with code 'EFHEMCL_NOTOKEN' in case FHEMWEB does use but not send the CSRF Token.
      */
     execPerlCode(code: string): Promise<string | number | void>;
-    private execPerlCode__;
-    private execPerlCode_;
     /**
      * Request FHEMWEB to execute a FHEM command.
      * @param cmd - The FHEM command to execute
@@ -162,71 +142,6 @@ declare class FhemClient {
      * @throws `Error` with code 'EFHEMCL_NOTOKEN' in case FHEMWEB does use but not send the CSRF Token.
      */
     execCmd(cmd: string): Promise<string | number | void>;
-    private execCmd__;
-    private execCmd_;
-    /**
-     * Obtains the CSRF token, if any, from FHEMWEB without causing a "FHEMWEB WEB CSRF error".
-     * @returns A `Promise<string>` that will be\
-     * resolved with the token or an empty string on success\
-     * or rejected with one of the following errors.
-     * @throws `Error` with code 'EFHEMCL_RES' in case of response error.
-     * @throws `Error` with code 'EFHEMCL_ABRT' in case the response closed prematurely.
-     * @throws `Error` with code 'EFHEMCL_TIMEDOUT' in case connecting timed out.
-     * @throws `Error` with code 'EFHEMCL_CONNREFUSED' in case the connection has been refused.
-     * @throws `Error` with code 'EFHEMCL_NETUNREACH' in case the network is unreachable.
-     * @throws `Error` with code 'EFHEMCL_CONNRESET' in case the connection has been reset by peer.
-     * @throws `Error` with code 'EFHEMCL_REQ' in case of a different request error.
-     * @throws `Error` with code 'EFHEMCL_AUTH' in case of wrong username or password.
-     * @throws `Error` with code 'EFHEMCL_WEBN' in case of a wrong FHEM 'webname'.
-     */
-    private obtainCsrfToken;
-    /**
-     * Used by `execCmd` and `obtainCsrfToken` for status codes
-     * which can be handled in a common way.
-     * @param res - The server response object.
-     * @param messagePrefix - Prefix for error message.
-     * @param reject - The function to reject the `Promise`.
-     */
-    private handleStatusCode;
-    /**
-     * Wraps a call to `this.client.get` in a `Promise<R>`.
-     * @template R The type of the value that will be passed to `resolve`.
-     * @param processResponse -
-     * A callback that will be called on server response with the response object,\
-     * as well as the two functions to `resolve` or `reject` the `Promise`.
-     * @returns A `Promise<R>` that will be resolved by `processResponse` on success\
-     * or rejected by `processResponse`, the request listener or the response listener\
-     * with one of the following errors.
-     * @throws `Error` with code 'EFHEMCL_RES' in case of response error.
-     * @throws `Error` with code 'EFHEMCL_ABRT' in case the response closed prematurely.
-     * @throws `Error` with code 'EFHEMCL_TIMEDOUT' in case connecting timed out.
-     * @throws `Error` with code 'EFHEMCL_CONNREFUSED' in case the connection has been refused.
-     * @throws `Error` with code 'EFHEMCL_NETUNREACH' in case the network is unreachable.
-     * @throws `Error` with code 'EFHEMCL_CONNRESET' in case the connection has been reset by peer.
-     * @throws `Error` with code 'EFHEMCL_REQ' in case of a different request error.
-     */
-    private getWithPromise;
-    /**
-     * Logs `message` as error, constructs an `Error` object with `message`
-     * and `code` 'EFHEMCL_<codeSuff>'.\
-     * Then, if `reject` function supplied, it is called with the `Error` object;\
-     * otherwise, the `Error` is thrown.
-     * @param message - The error message.
-     * @param codeSuff - `string` string to be appended to 'EFHEMCL_' to form the error code.
-     * @param reject - The function to reject the `Promise`.
-     */
-    private error;
-    /**
-     * Invokes `method` on `this` with `args`.\
-     * On error, if `expirationPeriod` property has been set to a positive value
-     * and we have a positive retry interval for the respective error code, the method
-     * will be invoked again after the specified time until it returns without error
-     * or `expirationPeriod` is exceeded.\
-     * If the latter occurs, the last error will be thrown.
-     * @param method - Instance method to be invoked.
-     * @param args - Arguments for `method`.
-     */
-    private callAndRetry;
 }
 /**
  * This results in `module.exports = FhemClient;` in the js output,

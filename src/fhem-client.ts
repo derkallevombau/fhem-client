@@ -179,11 +179,14 @@ class FhemClient
 {
 	/**
 	 * FHEM URL, username and password.
+	 * @internal
 	 */
 	private fhemOptions: FhemOptions;
 
+	/** @internal */
 	private getOptions: https.RequestOptions = { headers: { Connection: 'keep-alive' }, rejectUnauthorized: false };
 
+	/** @internal */
 	private retryIntervalFromCode = new Map(
 		[
 			['EFHEMCL_RES', 500],
@@ -194,16 +197,20 @@ class FhemClient
 		]
 	);
 
+	/** @internal */
 	private logger: Logger;
+	/** @internal */
 	private url: URL;
 
 	// typeof is crucial here since http and
 	// https are modules.
+	/** @internal */
 	private client: typeof http | typeof https;
 
 	/**
 	 * Flag indicating whether we aborted the current request
 	 * because it timed out.
+	 * @internal
 	 */
 	private reqAborted: boolean;
 
@@ -312,6 +319,7 @@ class FhemClient
 
 	/**
 	 * Actual 'callFn' before implementing retry feature.
+	 * @internal
 	 */
 	private callFn_(name: string, functionName: string, passDevHash?: boolean, functionReturnsHash?: boolean, ...args: (string | number)[])
 	{
@@ -421,6 +429,7 @@ class FhemClient
 		return this.execPerlCode__(code, false);
 	}
 
+	/** @internal */
 	private execPerlCode__(code: string, calledByCallFn: boolean)
 	{
 		// 'callAndRetry' calls the provided method via 'apply', so there is no problem.
@@ -428,6 +437,7 @@ class FhemClient
 		return this.callAndRetry(this.execPerlCode_, code, calledByCallFn);
 	}
 
+	/** @internal */
 	private execPerlCode_(code: string, calledByCallFn: boolean)
 	{
 		return this.execCmd__(`{ ${code} }`, calledByCallFn);
@@ -453,6 +463,7 @@ class FhemClient
 		return this.execCmd__(cmd, false);
 	}
 
+	/** @internal */
 	private execCmd__(cmd: string, calledByCallFn: boolean)
 	{
 		// 'callAndRetry' calls the provided method via 'apply', so there is no problem.
@@ -460,6 +471,7 @@ class FhemClient
 		return this.callAndRetry(this.execCmd_, cmd, calledByCallFn);
 	}
 
+	/** @internal */
 	private execCmd_(cmd: string, calledByCallFn: boolean): Promise<string | number>
 	{
 		const logger = this.logger;
@@ -555,6 +567,7 @@ class FhemClient
 	 * @throws `Error` with code 'EFHEMCL_REQ' in case of a different request error.
 	 * @throws `Error` with code 'EFHEMCL_AUTH' in case of wrong username or password.
 	 * @throws `Error` with code 'EFHEMCL_WEBN' in case of a wrong FHEM 'webname'.
+	 * @internal
 	 */
 	private obtainCsrfToken()
 	{
@@ -594,6 +607,7 @@ class FhemClient
 	 * @param res - The server response object.
 	 * @param messagePrefix - Prefix for error message.
 	 * @param reject - The function to reject the `Promise`.
+	 * @internal
 	 */
 	private handleStatusCode(res: http.IncomingMessage, messagePrefix: string, reject: (reason?: any) => void)
 	{
@@ -630,6 +644,7 @@ class FhemClient
 	 * @throws `Error` with code 'EFHEMCL_NETUNREACH' in case the network is unreachable.
 	 * @throws `Error` with code 'EFHEMCL_CONNRESET' in case the connection has been reset by peer.
 	 * @throws `Error` with code 'EFHEMCL_REQ' in case of a different request error.
+	 * @internal
 	 */
 	private getWithPromise<R>(processResponse: (res: http.IncomingMessage, resolve: (value?: R) => void, reject: (reason?: any) => void) => void): Promise<R>
 	{
@@ -715,6 +730,7 @@ class FhemClient
 	 * @param message - The error message.
 	 * @param codeSuff - `string` string to be appended to 'EFHEMCL_' to form the error code.
 	 * @param reject - The function to reject the `Promise`.
+	 * @internal
 	 */
 	private error(message: string, codeSuff: string, reject?: (reason?: any) => void)
 	{
@@ -735,6 +751,7 @@ class FhemClient
 	 * If the latter occurs, the last error will be thrown.
 	 * @param method - Instance method to be invoked.
 	 * @param args - Arguments for `method`.
+	 * @internal
 	 */
 	// Type params A and R copied from CallableFunction.apply (see tsconfig.json "strictBindCallApply").
 	private async callAndRetry<A extends any[], R>(method: (...args: A) => Promise<R>, ...args: A)
