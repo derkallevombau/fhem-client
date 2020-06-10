@@ -32,7 +32,7 @@
 		"compile": "npm run generateJs && npm run generateDts && npm run generateDoc",
 		"watch": "tsc --watch -p ./ --noEmitOnError false",
 		"lint": "eslint --ext .ts \"$npm_package_config_rootDir\"",
-		"generateDoc": "typedoc --options typedoc.js --inputFiles \"$npm_package_config_rootDir\"",
+		"generateDoc": "typedoc --options typedoc.js --inputFiles \"$npm_package_config_rootDir\" && touch docs/.nojekyll",
 		"lintCfgTsAdd": "git subtree add -P lintcfg-ts --squash \"$npm_package_config_lintCfgSubtreeRepoBasePath\"ts master && ln -s {lintcfg-ts/,}.eslintrc.js",
 		"lintCfgTsPush": "git subtree push -P lintcfg-ts \"$npm_package_config_lintCfgSubtreeRepoBasePath\"ts master",
 		"lintCfgTsPull": "git subtree pull -P lintcfg-ts --squash \"$npm_package_config_lintCfgSubtreeRepoBasePath\"ts master"
