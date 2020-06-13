@@ -94,6 +94,7 @@
 							<h3>Methods</h3>
 							<ul class="tsd-index-list">
 								<li class="tsd-kind-method tsd-parent-kind-class"><a href="_fhem_client_.fhemclient.html#callfn" class="tsd-kind-icon">call<wbr>Fn</a></li>
+								<li class="tsd-kind-method tsd-parent-kind-class"><a href="_fhem_client_.fhemclient.html#closeconnection" class="tsd-kind-icon">close<wbr>Connection</a></li>
 								<li class="tsd-kind-method tsd-parent-kind-class"><a href="_fhem_client_.fhemclient.html#execcmd" class="tsd-kind-icon">exec<wbr>Cmd</a></li>
 								<li class="tsd-kind-method tsd-parent-kind-class"><a href="_fhem_client_.fhemclient.html#execperlcode" class="tsd-kind-icon">exec<wbr>Perl<wbr>Code</a></li>
 							</ul>
@@ -212,7 +213,7 @@
 									</dd>
 									<dt>throws</dt>
 									<dd><p><code>Error</code> with code &#39;EFHEMCL_CF_FHEMERR&#39; in case FHEM returned an error message instead of the function&#39;s
-											return value, e. g. if <code>functionName</code> exists in the module hash, but the corresponding value names a function
+											return value,<br>e. g. if <code>functionName</code> exists in the module hash, but the corresponding value names a function
 										that doesn&#39;t exist.</p>
 									</dd>
 									<dt>throws</dt>
@@ -262,6 +263,27 @@
 							<p>If the function cannot be found in the module hash or returns undef, the result will be undefined.</p>
 							<p>If the function returns a scalar or a list, the result will be a value or an array, respectively.<br>Furthermore, if the list is even-sized and <code>functionReturnsHash === true</code>, the result will be a Map.</p>
 							<p>In either case, numbers will be returned as numbers, not as strings.</p>
+						</li>
+					</ul>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class">
+					<a name="closeconnection" class="tsd-anchor"></a>
+					<h3>close<wbr>Connection</h3>
+					<ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class">
+						<li class="tsd-signature tsd-kind-icon">close<wbr>Connection<span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">void</span></li>
+					</ul>
+					<ul class="tsd-descriptions">
+						<li class="tsd-description">
+							<aside class="tsd-sources">
+							</aside>
+							<div class="tsd-comment tsd-typography">
+								<div class="lead">
+									<p>If you have enabled <code>keepAlive</code> (the default), call this method when you do not
+										need to make any further requests.<br>This will destroy any sockets that are currently in use by the agent.<br>If you miss calling this method, your program will keep running until the server
+									terminates the connection.</p>
+								</div>
+							</div>
+							<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4>
 						</li>
 					</ul>
 				</section>
@@ -412,6 +434,9 @@
 							</li>
 							<li class=" tsd-kind-method tsd-parent-kind-class">
 								<a href="_fhem_client_.fhemclient.html#callfn" class="tsd-kind-icon">call<wbr>Fn</a>
+							</li>
+							<li class=" tsd-kind-method tsd-parent-kind-class">
+								<a href="_fhem_client_.fhemclient.html#closeconnection" class="tsd-kind-icon">close<wbr>Connection</a>
 							</li>
 							<li class=" tsd-kind-method tsd-parent-kind-class">
 								<a href="_fhem_client_.fhemclient.html#execcmd" class="tsd-kind-icon">exec<wbr>Cmd</a>

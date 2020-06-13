@@ -1,4 +1,72 @@
 /// <reference types="node" />
+/**
+ * A small Promise-based client for executing FHEM commands via FHEMWEB, supporting SSL, Basic Auth and CSRF Token.\
+ * Uses Node.js http or https module, depending on the protocol specified in the URL; no further dependencies.
+ *
+ * It provides the methods `execCmd`, `execPerlCode` and `callFn` to interact with FHEM.\
+ * See the [full documentation](https://derkallevombau.github.io/fhem-client/) for details.
+ *
+ * ## Changelog
+ * - 0.1.4:
+ *     - Retry on error via
+ *         - Property {@linkcode Options.retryIntervals} of `options` param of {@linkcode FhemClient.constructor}.
+ *         - Property {@linkcode FhemClient.expirationPeriod}
+ *     - Specify agent options via property {@linkcode Options.agentOptions} of `options` param of
+ *       {@linkcode FhemClient.constructor}.\
+ *       Especially useful to simply disable `keepAlive` instead of using the `Connection` header.
+ *     - New method `closeConnection` to destroy any sockets that are currently in use by the agent
+ *       in case `keepAlive` is enabled.
+ *     - Type definitions (.d.ts) included.
+ *     - Completely rewritten in TypeScript, targeting ES2020.
+ * - 0.1.2: Specify request options for http[s].get via property {@linkcode Options.getOptions} of
+ *   `options` param of {@linkcode FhemClient.constructor}.\
+ *   Especially useful to set a request timeout. There is a built-in timeout, but that's pretty long.\
+ *   FYI: Setting RequestOptions.timeout merely generates an event when the specified time has elapsed,
+ *   but we actually abort the request.
+ * - 0.1.1: Added specific error codes instead of just 'EFHEMCL'.
+ *
+ * ## Examples
+ * ### Import
+ * #### TypeScript
+ * ```typescript
+ * import FhemClient = require('fhem-client');
+ * ```
+ * #### JavaScript
+ * ```js
+ * const FhemClient = require('fhem-client');
+ * ```
+ * ### Usage
+ * ```js
+ * const fhemClient = new FhemClient(
+ * 	{
+ * 		url: 'https://localhost:8083/fhem',
+ * 		username: 'thatsme',
+ * 		password: 'topsecret',
+ * 		getOptions: { timeout: 2000 }
+ * 	}
+ * );
+ *
+ * fhemClient.expirationPeriod = 20000;
+ *
+ * fhemClient.execPerlCode('join("\n", map("Device: $_, type: $defs{$_}{TYPE}", keys %defs))')
+ * 	.then(
+ * 		result => console.log(`Your devices:\n${result as string}`),
+ * 		e      => console.log(`Error: Message: ${(e as Error).message}, code: ${(e as Error)['code'] as string}`)
+ * 		// Notice: In plain JS, or in TS with '// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/restrict-template-expressions'
+ * 		// (in case you are using @typescript-eslint), you can just write 'console.log(`Error: Message: ${e.message}, code: ${e.code}`)'.
+ * 	);
+ *
+ * fhemClient.execCmd('get hub currentActivity')
+ * 	.then(
+ * 		result => console.log('Current activity:', result),
+ * 		e      => console.log(`Error: Message: ${(e as Error).message}, code: ${(e as Error)['code'] as string}`)
+ * 	).finally(
+ * 		() => fhemClient.closeConnection()
+ * 	);
+ * ```
+ * @packageDocumentation
+ */
+import * as http from 'http';
 import * as https from 'https';
 /** @ignore */
 declare type LogMethod = (level: string, ...args: any[]) => void;
@@ -28,15 +96,21 @@ interface FhemOptions {
 }
 interface Options extends FhemOptions {
     /**
-     * Options for http[s].get.\
-     * Defaults to `{ headers: { Connection: 'keep-alive' }, rejectUnauthorized: false }`.\
+     * An object for specifying options for the agent to be used for the requests
+     * (See [Node.js API doc](https://nodejs.org/api/http.html#http_new_agent_options)).\
+     * Defaults to `{ keepAlive: true }`.\
      * If you specify additional options, they will be merged with the defaults.\
      * If you specify an option that has a default value, your value will override the default.
-     * This also means that if you specify an object for `headers`, it will
-     * completely replace the default one.\
-     * If you specify `timeout`, it will work as expected (i. e. throw an `Error` when a timeout occurs).
      */
-    getOptions?: https.RequestOptions;
+    agentOptions?: http.AgentOptions | https.AgentOptions;
+    /**
+     * An object for specifying request options for http[s].get (See [Node.js API doc](https://nodejs.org/api/https.html#https_https_request_url_options_callback)).\
+     * Defaults to `{ rejectUnauthorized: false }`.\
+     * If you specify additional options, they will be merged with the defaults.\
+     * If you specify an option that has a default value, your value will override the default.\
+     * If you specify a `timeout`, it will work as you would expect (i. e. throw an `Error` when a timeout occurs).
+     */
+    getOptions?: http.RequestOptions | https.RequestOptions;
     /**
      * An array whose elements are arrays containing an error code
      * and a retry interval in millis.\
@@ -72,6 +146,14 @@ declare class FhemClient {
      */
     constructor(options: Options, logger?: Logger);
     /**
+     * If you have enabled `keepAlive` (the default), call this method when you do not
+     * need to make any further requests.\
+     * This will destroy any sockets that are currently in use by the agent.\
+     * If you miss calling this method, your program will keep running until the server
+     * terminates the connection.
+     */
+    closeConnection(): void;
+    /**
      * Request FHEMWEB to call a registered module function. This method corresponds to FHEM's Perl function 'CallFn'.
      * @param name - The name of the device to call the function for.
      * @param functionName - The name of the function as used to register it in the module hash.
@@ -104,7 +186,8 @@ declare class FhemClient {
      * @throws `Error` with code 'EFHEMCL_WEBN' in case of a wrong FHEM 'webname'.
      * @throws `Error` with code 'EFHEMCL_NOTOKEN' in case FHEMWEB does use but not send the CSRF Token.
      * @throws `Error` with code 'EFHEMCL_CF_FHEMERR' in case FHEM returned an error message instead of the function's
-     * return value, e. g. if `functionName` exists in the module hash, but the corresponding value names a function
+     * return value,\
+     * e. g. if `functionName` exists in the module hash, but the corresponding value names a function
      * that doesn't exist.
      * @throws `Error` with code 'EFHEMCL_CF_ODDLIST' in case `functionReturnsHash === true` and the function returned
      * an odd-sized list.

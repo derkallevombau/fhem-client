@@ -86,6 +86,7 @@
 						<section class="tsd-index-section tsd-is-not-exported">
 							<h3>Properties</h3>
 							<ul class="tsd-index-list">
+								<li class="tsd-kind-property tsd-parent-kind-interface tsd-is-not-exported"><a href="_fhem_client_.options.html#agentoptions" class="tsd-kind-icon">agent<wbr>Options</a></li>
 								<li class="tsd-kind-property tsd-parent-kind-interface tsd-is-not-exported"><a href="_fhem_client_.options.html#getoptions" class="tsd-kind-icon">get<wbr>Options</a></li>
 								<li class="tsd-kind-property tsd-parent-kind-interface tsd-is-inherited tsd-is-not-exported"><a href="_fhem_client_.options.html#password" class="tsd-kind-icon">password</a></li>
 								<li class="tsd-kind-property tsd-parent-kind-interface tsd-is-not-exported"><a href="_fhem_client_.options.html#retryintervals" class="tsd-kind-icon">retry<wbr>Intervals</a></li>
@@ -99,16 +100,27 @@
 			<section class="tsd-panel-group tsd-member-group tsd-is-not-exported">
 				<h2>Properties</h2>
 				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-interface tsd-is-not-exported">
-					<a name="getoptions" class="tsd-anchor"></a>
-					<h3><span class="tsd-flag ts-flagOptional">Optional</span> get<wbr>Options</h3>
-					<div class="tsd-signature tsd-kind-icon">get<wbr>Options<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">https.RequestOptions</span></div>
+					<a name="agentoptions" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagOptional">Optional</span> agent<wbr>Options</h3>
+					<div class="tsd-signature tsd-kind-icon">agent<wbr>Options<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">AgentOptions</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">AgentOptions</span></div>
 					<aside class="tsd-sources">
 					</aside>
 					<div class="tsd-comment tsd-typography">
 						<div class="lead">
-							<p>Options for http[s].get.<br>Defaults to <code>{ headers: { Connection: &#39;keep-alive&#39; }, rejectUnauthorized: false }</code>.<br>If you specify additional options, they will be merged with the defaults.<br>If you specify an option that has a default value, your value will override the default.
-								This also means that if you specify an object for <code>headers</code>, it will
-							completely replace the default one.<br>If you specify <code>timeout</code>, it will work as expected (i. e. throw an <code>Error</code> when a timeout occurs).</p>
+							<p>An object for specifying options for the agent to be used for the requests
+							(See <a href="https://nodejs.org/api/http.html#http_new_agent_options">Node.js API doc</a>).<br>Defaults to <code>{ keepAlive: true }</code>.<br>If you specify additional options, they will be merged with the defaults.<br>If you specify an option that has a default value, your value will override the default.</p>
+						</div>
+					</div>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-interface tsd-is-not-exported">
+					<a name="getoptions" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagOptional">Optional</span> get<wbr>Options</h3>
+					<div class="tsd-signature tsd-kind-icon">get<wbr>Options<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">RequestOptions</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">https.RequestOptions</span></div>
+					<aside class="tsd-sources">
+					</aside>
+					<div class="tsd-comment tsd-typography">
+						<div class="lead">
+							<p>An object for specifying request options for http[s].get (See <a href="https://nodejs.org/api/https.html#https_https_request_url_options_callback">Node.js API doc</a>).<br>Defaults to <code>{ rejectUnauthorized: false }</code>.<br>If you specify additional options, they will be merged with the defaults.<br>If you specify an option that has a default value, your value will override the default.<br>If you specify a <code>timeout</code>, it will work as you would expect (i. e. throw an <code>Error</code> when a timeout occurs).</p>
 						</div>
 					</div>
 				</section>
@@ -142,11 +154,11 @@
 							<h3>Example (the defaults)</h3>
 						</a>
 						<pre><code class="language-js">[
-    [<span class="hljs-string">'EFHEMCL_RES'</span>, <span class="hljs-number">500</span>],
-    [<span class="hljs-string">'EFHEMCL_ABRT'</span>, <span class="hljs-number">500</span>],
-    [<span class="hljs-string">'EFHEMCL_TIMEDOUT'</span>, <span class="hljs-number">1000</span>],
-    [<span class="hljs-string">'EFHEMCL_CONNREFUSED'</span>, <span class="hljs-number">10000</span>],
-    [<span class="hljs-string">'EFHEMCL_NETUNREACH'</span>, <span class="hljs-number">10000</span>]
+    [<span class="hljs-string">&#x27;EFHEMCL_RES&#x27;</span>, <span class="hljs-number">500</span>],
+    [<span class="hljs-string">&#x27;EFHEMCL_ABRT&#x27;</span>, <span class="hljs-number">500</span>],
+    [<span class="hljs-string">&#x27;EFHEMCL_TIMEDOUT&#x27;</span>, <span class="hljs-number">1000</span>],
+    [<span class="hljs-string">&#x27;EFHEMCL_CONNREFUSED&#x27;</span>, <span class="hljs-number">10000</span>],
+    [<span class="hljs-string">&#x27;EFHEMCL_NETUNREACH&#x27;</span>, <span class="hljs-number">10000</span>]
 ]</code></pre>
 					</div>
 				</section>
@@ -199,6 +211,9 @@
 					<li class="current tsd-kind-interface tsd-parent-kind-module tsd-is-not-exported">
 						<a href="_fhem_client_.options.html" class="tsd-kind-icon">Options</a>
 						<ul>
+							<li class=" tsd-kind-property tsd-parent-kind-interface tsd-is-not-exported">
+								<a href="_fhem_client_.options.html#agentoptions" class="tsd-kind-icon">agent<wbr>Options</a>
+							</li>
 							<li class=" tsd-kind-property tsd-parent-kind-interface tsd-is-not-exported">
 								<a href="_fhem_client_.options.html#getoptions" class="tsd-kind-icon">get<wbr>Options</a>
 							</li>

@@ -21,16 +21,29 @@
  * A small Promise-based client for executing FHEM commands via FHEMWEB, supporting SSL, Basic Auth and CSRF Token.\
  * Uses Node.js http or https module, depending on the protocol specified in the URL; no further dependencies.
  *
+ * It provides the methods `execCmd`, `execPerlCode` and `callFn` to interact with FHEM.\
+ * See the [full documentation](https://derkallevombau.github.io/fhem-client/) for details.
+ *
  * ## Changelog
  * - 0.1.4:
  *     - Retry on error via
  *         - Property {@linkcode Options.retryIntervals} of `options` param of {@linkcode FhemClient.constructor}.
  *         - Property {@linkcode FhemClient.expirationPeriod}
+ *     - Specify agent options via property {@linkcode Options.agentOptions} of `options` param of
+ *       {@linkcode FhemClient.constructor}.\
+ *       Especially useful to simply disable `keepAlive` instead of using the `Connection` header.
+ *     - New method `closeConnection` to destroy any sockets that are currently in use by the agent
+ *       in case `keepAlive` is enabled.
  *     - Type definitions (.d.ts) included.
  *     - Completely rewritten in TypeScript, targeting ES2020.
- * - 0.1.2: Specify options for http[s].get via property {@linkcode Options.getOptions} of `options` param of {@linkcode FhemClient.constructor}.
+ * - 0.1.2: Specify request options for http[s].get via property {@linkcode Options.getOptions} of
+ *   `options` param of {@linkcode FhemClient.constructor}.\
+ *   Especially useful to set a request timeout. There is a built-in timeout, but that's pretty long.\
+ *   FYI: Setting RequestOptions.timeout merely generates an event when the specified time has elapsed,
+ *   but we actually abort the request.
+ * - 0.1.1: Added specific error codes instead of just 'EFHEMCL'.
  *
- * ## Example
+ * ## Examples
  * ### Import
  * #### TypeScript
  * ```typescript
@@ -47,21 +60,27 @@
  * 		url: 'https://localhost:8083/fhem',
  * 		username: 'thatsme',
  * 		password: 'topsecret',
- * 		getOptions: { timeout: 5000 }
+ * 		getOptions: { timeout: 2000 }
  * 	}
  * );
  *
- * fhemClient.expirationPeriod = 10000;
+ * fhemClient.expirationPeriod = 20000;
  *
- * fhemClient.execCmd('set lamp on').then(
- * 	() => console.log('Succeeded'),
- * 	e  => console.log(`Error: Message: ${e.message}, code: ${e.code}`)
- * );
+ * fhemClient.execPerlCode('join("\n", map("Device: $_, type: $defs{$_}{TYPE}", keys %defs))')
+ * 	.then(
+ * 		result => console.log(`Your devices:\n${result as string}`),
+ * 		e      => console.log(`Error: Message: ${(e as Error).message}, code: ${(e as Error)['code'] as string}`)
+ * 		// Notice: In plain JS, or in TS with '// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/restrict-template-expressions'
+ * 		// (in case you are using @typescript-eslint), you can just write 'console.log(`Error: Message: ${e.message}, code: ${e.code}`)'.
+ * 	);
  *
- * fhemClient.execCmd('get hub currentActivity').then(
- * 	result => console.log('Current activity:', result),
- * 	e      => console.log(`Error: Message: ${e.message}, code: ${e.code}`)
- * );
+ * fhemClient.execCmd('get hub currentActivity')
+ * 	.then(
+ * 		result => console.log('Current activity:', result),
+ * 		e      => console.log(`Error: Message: ${(e as Error).message}, code: ${(e as Error)['code'] as string}`)
+ * 	).finally(
+ * 		() => fhemClient.closeConnection()
+ * 	);
  * ```
  * @packageDocumentation
  */
@@ -108,15 +127,23 @@ interface FhemOptions
 interface Options extends FhemOptions
 {
 	/**
-	 * Options for http[s].get.\
-	 * Defaults to `{ headers: { Connection: 'keep-alive' }, rejectUnauthorized: false }`.\
+	 * An object for specifying options for the agent to be used for the requests
+	 * (See [Node.js API doc](https://nodejs.org/api/http.html#http_new_agent_options)).\
+	 * Defaults to `{ keepAlive: true }`.\
 	 * If you specify additional options, they will be merged with the defaults.\
 	 * If you specify an option that has a default value, your value will override the default.
-	 * This also means that if you specify an object for `headers`, it will
-	 * completely replace the default one.\
-	 * If you specify `timeout`, it will work as expected (i. e. throw an `Error` when a timeout occurs).
 	 */
-	getOptions?: https.RequestOptions;
+	agentOptions?: http.AgentOptions | https.AgentOptions;
+
+	/**
+	 * An object for specifying request options for http[s].get (See [Node.js API doc](https://nodejs.org/api/https.html#https_https_request_url_options_callback)).\
+	 * Defaults to `{ rejectUnauthorized: false }`.\
+	 * If you specify additional options, they will be merged with the defaults.\
+	 * If you specify an option that has a default value, your value will override the default.\
+	 * If you specify a `timeout`, it will work as you would expect (i. e. throw an `Error` when a timeout occurs).
+	 */
+	getOptions?: http.RequestOptions | https.RequestOptions;
+
 	/**
 	 * An array whose elements are arrays containing an error code
 	 * and a retry interval in millis.\
@@ -183,8 +210,11 @@ class FhemClient
 	 */
 	private fhemOptions: FhemOptions;
 
-	/** @internal */
-	private getOptions: https.RequestOptions = { headers: { Connection: 'keep-alive' }, rejectUnauthorized: false };
+	/**
+	 * Request options for http[s].get.
+	 * @internal
+	 */
+	private getOptions: http.RequestOptions | https.RequestOptions = { rejectUnauthorized: false };
 
 	/** @internal */
 	private retryIntervalFromCode = new Map(
@@ -206,13 +236,6 @@ class FhemClient
 	// https are modules.
 	/** @internal */
 	private client: typeof http | typeof https;
-
-	/**
-	 * Flag indicating whether we aborted the current request
-	 * because it timed out.
-	 * @internal
-	 */
-	private reqAborted: boolean;
 
 	/**
 	 * Time in millis after which to discard a failed request.
@@ -242,6 +265,10 @@ class FhemClient
 		this.getOptions = { ...this.getOptions, ...options.getOptions };
 		delete options.getOptions;
 
+		// Merge user-provided agent options with defaults and remove from 'options'.
+		const agentOptions = { keepAlive: true, ...options.agentOptions };
+		delete options.agentOptions;
+
 		// Merge user-provided retry intervals with defaults and remove from 'options'.
 		if (options.retryIntervals)
 			for (const codeAndInterval of options.retryIntervals)
@@ -250,6 +277,19 @@ class FhemClient
 
 		// Remaining entries are FHEM options.
 		this.fhemOptions = options;
+
+		this.client = this.url.protocol === 'https:' ? https : http; // Yes, Node.js forces the user to select the appropriate module.
+
+		// Create and set agent for requests
+		this.getOptions.agent = new this.client.Agent(agentOptions);
+
+		if (options.username && options.password)
+		{
+			this.url.username = options.username;
+			this.url.password = options.password;
+		}
+
+		this.url.searchParams.set('XHR', '1'); // We just want the result of the command, not the whole page.
 
 		if (logger) this.logger = logger;
 		else
@@ -260,16 +300,20 @@ class FhemClient
 
 			for (const fnName of ['log', 'debug', 'info', 'warn', 'error']) this.logger[fnName] = dummyFn;
 		}
+	}
 
-		this.client = this.url.protocol === 'https:' ? https : http; // Yes, Node.js forces the user to select the appropriate module.
+	/**
+	 * If you have enabled `keepAlive` (the default), call this method when you do not
+	 * need to make any further requests.\
+	 * This will destroy any sockets that are currently in use by the agent.\
+	 * If you miss calling this method, your program will keep running until the server
+	 * terminates the connection.
+	 */
+	closeConnection(): void
+	{
+		(this.getOptions.agent as http.Agent).destroy();
 
-		if (options.username && options.password)
-		{
-			this.url.username = options.username;
-			this.url.password = options.password;
-		}
-
-		this.url.searchParams.set('XHR', '1'); // We just want the result of the command, not the whole page.
+		this.logger.info('closeConnection: Called Agent.destroy().');
 	}
 
 	/**
@@ -305,7 +349,8 @@ class FhemClient
 	 * @throws `Error` with code 'EFHEMCL_WEBN' in case of a wrong FHEM 'webname'.
 	 * @throws `Error` with code 'EFHEMCL_NOTOKEN' in case FHEMWEB does use but not send the CSRF Token.
 	 * @throws `Error` with code 'EFHEMCL_CF_FHEMERR' in case FHEM returned an error message instead of the function's
-	 * return value, e. g. if `functionName` exists in the module hash, but the corresponding value names a function
+	 * return value,\
+	 * e. g. if `functionName` exists in the module hash, but the corresponding value names a function
 	 * that doesn't exist.
 	 * @throws `Error` with code 'EFHEMCL_CF_ODDLIST' in case `functionReturnsHash === true` and the function returned
 	 * an odd-sized list.
@@ -314,14 +359,14 @@ class FhemClient
 	{
 		// 'callAndRetry' calls the provided method via 'apply', so there is no problem.
 		// eslint-disable-next-line @typescript-eslint/unbound-method
-		return this.callAndRetry(this.callFn_, name, functionName, passDevHash, functionReturnsHash, ...args);
+		return this.callAndRetry(this.callFn__, name, functionName, passDevHash, functionReturnsHash, ...args);
 	}
 
 	/**
 	 * Actual 'callFn' before implementing retry feature.
 	 * @internal
 	 */
-	private callFn_(name: string, functionName: string, passDevHash?: boolean, functionReturnsHash?: boolean, ...args: (string | number)[])
+	private callFn__(name: string, functionName: string, passDevHash?: boolean, functionReturnsHash?: boolean, ...args: (string | number)[])
 	{
 		const logger = this.logger;
 
@@ -383,7 +428,7 @@ class FhemClient
 				}
 				catch (e) // ret must be an error message from FHEM.
 				{
-					error(`callFn: Failed to invoke ${functionName}() of FHEM device ${name}: ${ret as string | number}.`, 'CF_FHEMERR');
+					error(`callFn: Failed to invoke ${functionName} of FHEM device ${name}: ${ret}.`, 'CF_FHEMERR');
 				}
 
 				if (retArray.length === 1) return retArray[0];
@@ -426,19 +471,19 @@ class FhemClient
 	 */
 	execPerlCode(code: string): Promise<string | number | void>
 	{
-		return this.execPerlCode__(code, false);
-	}
-
-	/** @internal */
-	private execPerlCode__(code: string, calledByCallFn: boolean)
-	{
-		// 'callAndRetry' calls the provided method via 'apply', so there is no problem.
-		// eslint-disable-next-line @typescript-eslint/unbound-method
-		return this.callAndRetry(this.execPerlCode_, code, calledByCallFn);
+		return this.execPerlCode_(code, false);
 	}
 
 	/** @internal */
 	private execPerlCode_(code: string, calledByCallFn: boolean)
+	{
+		// 'callAndRetry' calls the provided method via 'apply', so there is no problem.
+		// eslint-disable-next-line @typescript-eslint/unbound-method
+		return this.callAndRetry(this.execPerlCode__, code, calledByCallFn);
+	}
+
+	/** @internal */
+	private execPerlCode__(code: string, calledByCallFn: boolean)
 	{
 		return this.execCmd__(`{ ${code} }`, calledByCallFn);
 	}
@@ -460,19 +505,19 @@ class FhemClient
 	 */
 	execCmd(cmd: string): Promise<string | number | void>
 	{
-		return this.execCmd__(cmd, false);
+		return this.execCmd_(cmd, false);
 	}
 
 	/** @internal */
-	private execCmd__(cmd: string, calledByCallFn: boolean)
+	private execCmd_(cmd: string, calledByCallFn: boolean)
 	{
 		// 'callAndRetry' calls the provided method via 'apply', so there is no problem.
 		// eslint-disable-next-line @typescript-eslint/unbound-method
-		return this.callAndRetry(this.execCmd_, cmd, calledByCallFn);
+		return this.callAndRetry(this.execCmd__, cmd, calledByCallFn);
 	}
 
 	/** @internal */
-	private execCmd_(cmd: string, calledByCallFn: boolean): Promise<string | number>
+	private execCmd__(cmd: string, calledByCallFn: boolean): Promise<string | number>
 	{
 		const logger = this.logger;
 		const url    = this.url;
@@ -487,11 +532,13 @@ class FhemClient
 					{
 						if (token) url.searchParams.set('fwcsrf', token);
 
-						return this.execCmd_(cmd, calledByCallFn);
+						return this.execCmd__(cmd, calledByCallFn);
 					}
 				);
 		}
 
+		// Log as debug if we execute a command from callFn
+		// since callFn already created a log entry.
 		logger.log(calledByCallFn ? 'debug' : 'info', `execCmd: Executing FHEM command '${cmd}'...`);
 
 		url.searchParams.set('cmd', cmd);
@@ -534,7 +581,7 @@ class FhemClient
 							url.searchParams.set('fwcsrf', res.headers['x-fhem-csrftoken'] as string);
 
 							// ...and call this method again.
-							this.execCmd_(cmd, calledByCallFn)
+							this.execCmd__(cmd, calledByCallFn)
 								.then(
 									result => resolve(result),
 									e      => reject(e)
@@ -677,7 +724,7 @@ class FhemClient
 
 						switch (code)
 						{
-							case 'ETIMEDOUT': // This has nothing to do with 'timeout' option. There is a built-in timeout, but that's pretty long.
+							case 'ETIMEDOUT': // Either because of 'timeout' option or the built-in timeout.
 								error(`execCmd: Connecting to ${this.fhemOptions.url} timed out.`, 'TIMEDOUT', reject);
 								break;
 							case 'ECONNREFUSED':
@@ -687,13 +734,6 @@ class FhemClient
 								error(`execCmd: Cannot connect to ${this.fhemOptions.url}: Network is unreachable.`, 'NETUNREACH', reject);
 								break;
 							case 'ECONNRESET':
-								if (this.reqAborted)
-								{
-									this.reqAborted = false;
-									error(`execCmd: Connecting to ${this.fhemOptions.url} timed out.`, 'TIMEDOUT', reject);
-									break;
-								}
-
 								error(`execCmd: Connection reset by ${this.url.host}. Check if '${this.url.protocol}' is the right protocol.`, 'CONNRESET', reject);
 								break;
 							default:
@@ -703,19 +743,14 @@ class FhemClient
 				).on('timeout',
 					() =>
 					{
-						// N.B.: Setting RequestOptions.timeout merely generates this event when the specified time has elapsed;
-						// the request must be aborted manually.
-						// Furthermore, this event is emitted even after the response has been received. In this case, aborting
-						// the request would not harm, but setting the flag below would result in the next actual ECONNRESET being
-						// incorrectly treated as ETIMEOUT. Thus, we remove this listener as soon as we receive a response.
-						// This event will not be emitted after the 'error' event has been emitted.
+						// N.B.: - Setting RequestOptions.timeout merely generates this event when the specified time has elapsed;
+						//         the request must be aborted manually.
+						//       - This event is emitted even after the response has been received.
+						//       - This event will not be emitted after the 'error' event has been emitted.
 
 						logger.info('Aborting request because timeout value set by user exceeded.');
 
-						// Aborting the request results in ECONNRESET, not what the user would expect on a timeout...
-						// Thus, we set a flag that causes next ECONNRESET to be treated as ETIMEDOUT.
-						this.reqAborted = true;
-						req.abort();
+						req.destroy(new ErrorWithCode('', 'ETIMEDOUT'));
 					}
 				);
 			}
