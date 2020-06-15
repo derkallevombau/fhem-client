@@ -359,14 +359,14 @@ class FhemClient
 	{
 		// 'callAndRetry' calls the provided method via 'apply', so there is no problem.
 		// eslint-disable-next-line @typescript-eslint/unbound-method
-		return this.callAndRetry(this.callFn__, name, functionName, passDevHash, functionReturnsHash, ...args);
+		return this.callAndRetry(this.callFn_, name, functionName, passDevHash, functionReturnsHash, ...args);
 	}
 
 	/**
 	 * Actual 'callFn' before implementing retry feature.
 	 * @internal
 	 */
-	private callFn__(name: string, functionName: string, passDevHash?: boolean, functionReturnsHash?: boolean, ...args: (string | number)[])
+	private callFn_(name: string, functionName: string, passDevHash?: boolean, functionReturnsHash?: boolean, ...args: (string | number)[])
 	{
 		const logger = this.logger;
 
@@ -377,6 +377,8 @@ class FhemClient
 		const error = this.error.bind(this);
 
 		logger.info(`callFn: Invoking ${functionName}() of FHEM device ${name} with arguments`, ['<device hash>', ...args]); // Using spread operator to merge arrays
+
+		// Build Perl code string.
 
 		const useStatement = "use Scalar::Util 'looks_like_number'";
 		let translateUndefined: string;
@@ -409,7 +411,9 @@ class FhemClient
 
 		const code = translateUndefined ? `${useStatement};;${translateUndefined};;my @ret=${invocation};;${processRet}` : `${useStatement};;my @ret=${invocation};;${processRet}`;
 
-		return this.execPerlCode__(code, true).then(
+		// Execute it.
+
+		return this.execPerlCode_(code, true).then(
 			ret => // Either 'undef' or an array in JSON (see 'processRet'), or an FHEM error message.
 			{
 				if (ret === 'undef') return;
@@ -471,21 +475,19 @@ class FhemClient
 	 */
 	execPerlCode(code: string): Promise<string | number | void>
 	{
-		return this.execPerlCode_(code, false);
-	}
-
-	/** @internal */
-	private execPerlCode_(code: string, calledByCallFn: boolean)
-	{
 		// 'callAndRetry' calls the provided method via 'apply', so there is no problem.
 		// eslint-disable-next-line @typescript-eslint/unbound-method
-		return this.callAndRetry(this.execPerlCode__, code, calledByCallFn);
+		return this.callAndRetry(this.execPerlCode_, code, false);
 	}
 
 	/** @internal */
-	private execPerlCode__(code: string, calledByCallFn: boolean)
+	private execPerlCode_(code: string, calledInternally: boolean)
 	{
-		return this.execCmd__(`{ ${code} }`, calledByCallFn);
+		// Log as debug if we have been called internally
+		// since the method called by the user has already created a log entry.
+		this.logger.log(calledInternally ? 'debug' : 'info', `execPerlCode: Executing '${code}'...`);
+
+		return this.execCmd_(`{ ${code} }`, true);
 	}
 
 	/**
@@ -505,19 +507,13 @@ class FhemClient
 	 */
 	execCmd(cmd: string): Promise<string | number | void>
 	{
-		return this.execCmd_(cmd, false);
-	}
-
-	/** @internal */
-	private execCmd_(cmd: string, calledByCallFn: boolean)
-	{
 		// 'callAndRetry' calls the provided method via 'apply', so there is no problem.
 		// eslint-disable-next-line @typescript-eslint/unbound-method
-		return this.callAndRetry(this.execCmd__, cmd, calledByCallFn);
+		return this.callAndRetry(this.execCmd_, cmd, false);
 	}
 
 	/** @internal */
-	private execCmd__(cmd: string, calledByCallFn: boolean): Promise<string | number>
+	private execCmd_(cmd: string, calledInternally: boolean): Promise<string | number>
 	{
 		const logger = this.logger;
 		const url    = this.url;
@@ -526,20 +522,22 @@ class FhemClient
 		// No token => Obtain it and call this method again.
 		if (!url.searchParams.get('fwcsrf'))
 		{
+			logger.info('execCmd: We do not yet have a CSRF token, going to obtain it...');
+
 			return this.obtainCsrfToken()
 				.then(
 					token =>
 					{
 						if (token) url.searchParams.set('fwcsrf', token);
 
-						return this.execCmd__(cmd, calledByCallFn);
+						return this.execCmd_(cmd, calledInternally);
 					}
 				);
 		}
 
-		// Log as debug if we execute a command from callFn
-		// since callFn already created a log entry.
-		logger.log(calledByCallFn ? 'debug' : 'info', `execCmd: Executing FHEM command '${cmd}'...`);
+		// Log as debug if we have been called internally
+		// since the method called by the user has already created a log entry.
+		logger.log(calledInternally ? 'debug' : 'info', `execCmd: Executing FHEM command '${cmd}'...`);
 
 		url.searchParams.set('cmd', cmd);
 
@@ -560,7 +558,7 @@ class FhemClient
 								// In case an error message is returned, it already contains a newline.
 								body = body.replace(/\n+$/, '');
 
-								logger.debug(`execCmd: Request succeeded. Response: '${body}'`);
+								logger.debug(`execCmd: Request succeeded. Response: '${body.length > 50 ? body.slice(0, 50) + '...' : body}'`);
 
 								// If we got a number, return it as such.
 								const number = Number(body);
@@ -572,16 +570,16 @@ class FhemClient
 					case 400: // No or invalid CSRF token when requesting execution of 'cmd'
 						if (url.searchParams.has('fwcsrf'))
 						{
-							logger.info('execCmd: CSRF token no longer valid, updating token and reissuing request.');
+							logger.info('execCmd: CSRF token no longer valid, updating token and reissuing request...');
 
-							// Update token...
+							// Set the new token which FHEM has sent us in the response...
 							// N.B.: The elements of res.headers['foo'] are of type string[].
 							//       But since we know that the CSRF token is a single string,
 							//       we use a Type Assertion here.
 							url.searchParams.set('fwcsrf', res.headers['x-fhem-csrftoken'] as string);
 
 							// ...and call this method again.
-							this.execCmd__(cmd, calledByCallFn)
+							this.execCmd_(cmd, calledInternally)
 								.then(
 									result => resolve(result),
 									e      => reject(e)
@@ -620,6 +618,8 @@ class FhemClient
 	{
 		const logger = this.logger;
 
+		assert(!this.url.searchParams.get('cmd'));
+
 		return this.getWithPromise<string>(
 			(res, resolve, reject) =>
 			{
@@ -631,18 +631,18 @@ class FhemClient
 
 				switch (res.statusCode)
 				{
-					case 400: // No or invalid CSRF token when requesting execution of 'cmd', but we shouldn't have a cmd here.
-						logger.warn('execCmd: Got 400 when obtaining CSRF token. This should not happen!');
+					case 400: // No or invalid CSRF token when requesting execution of 'cmd', but we don't have a cmd here.
+						logger.warn('obtainCsrfToken: Got 400. This should not happen!');
 					// eslint-disable-next-line no-fallthrough
 					case 200: // A GET request with correct authentication and without 'cmd' and 'fwcsrf' params gives no error.
-						if (token) logger.info('execCmd: Obtained CSRF token');
-						else logger.warn("execCmd: No CSRF token received. Either this FHEMWEB doesn't use it, or it doesn't send it. We will see...");
+						if (token) logger.debug('obtainCsrfToken: Succeeded.');
+						else logger.warn("obtainCsrfToken: No CSRF token received. Either this FHEMWEB doesn't use it, or it doesn't send it. We will see...");
 
 						resolve(token);
 
 						break;
 					default:
-						this.handleStatusCode(res, 'execCmd: Failed to get CSRF token', reject);
+						this.handleStatusCode(res, 'obtainCsrfToken: Failed to get CSRF token', reject);
 				}
 			}
 		);
