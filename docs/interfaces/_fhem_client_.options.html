@@ -146,7 +146,7 @@
 					<div class="tsd-comment tsd-typography">
 						<div class="lead">
 							<p>An array whose elements are arrays containing an error code
-								and a retry interval in millis.<br>If <code>expirationPeriod</code> property has been set to a positive value and a request fails, then, if the respective error code has a positive
+								and a retry interval in millis.<br>If <a href="../classes/_fhem_client_.fhemclient.html#expirationperiod"><code>FhemClient.expirationPeriod</code></a> property has been set to a positive value and a request fails, then, if the respective error code has a positive
 								retry interval, it will be reissued after the specified time until it succeeds or expires.<br>Some errors already have a default retry interval; you can use this parameter to override defaults and to set retry intervals
 							for errors that do not have a default one.</p>
 						</div>
@@ -154,11 +154,11 @@
 							<h3>Example (the defaults)</h3>
 						</a>
 						<pre><code class="language-js">[
-    [<span class="hljs-string">'EFHEMCL_RES'</span>, <span class="hljs-number">500</span>],
-    [<span class="hljs-string">'EFHEMCL_ABRT'</span>, <span class="hljs-number">500</span>],
-    [<span class="hljs-string">'EFHEMCL_TIMEDOUT'</span>, <span class="hljs-number">1000</span>],
-    [<span class="hljs-string">'EFHEMCL_CONNREFUSED'</span>, <span class="hljs-number">10000</span>],
-    [<span class="hljs-string">'EFHEMCL_NETUNREACH'</span>, <span class="hljs-number">10000</span>]
+    [<span class="hljs-string">&#x27;EFHEMCL_RES&#x27;</span>, <span class="hljs-number">500</span>],
+    [<span class="hljs-string">&#x27;EFHEMCL_ABRT&#x27;</span>, <span class="hljs-number">500</span>],
+    [<span class="hljs-string">&#x27;EFHEMCL_TIMEDOUT&#x27;</span>, <span class="hljs-number">1000</span>],
+    [<span class="hljs-string">&#x27;EFHEMCL_CONNREFUSED&#x27;</span>, <span class="hljs-number">10000</span>],
+    [<span class="hljs-string">&#x27;EFHEMCL_NETUNREACH&#x27;</span>, <span class="hljs-number">10000</span>]
 ]</code></pre>
 					</div>
 				</section>

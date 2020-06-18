@@ -158,7 +158,8 @@
 					</aside>
 					<div class="tsd-comment tsd-typography">
 						<div class="lead">
-							<p>Time in millis after which to discard a failed request.
+							<p>Time in millis after which to discard a failed request.<br>If this has been set to a positive value and a request fails, then, if the respective error code has a positive
+								retry interval, it will be reissued after the specified time until it succeeds or <code>expirationPeriod</code> is exceeded.<br>If set to 0 (the default), a failed request will be discarded immediately and an <code>Error</code> will be thrown.
 							See property <a href="../interfaces/_fhem_client_.options.html#retryintervals"><code>Options.retryIntervals</code></a> of <code>options</code> param of <a href="_fhem_client_.fhemclient.html#constructor"><code>FhemClient.constructor</code></a>.</p>
 						</div>
 					</div>

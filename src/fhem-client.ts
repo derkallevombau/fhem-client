@@ -147,7 +147,7 @@ interface Options extends FhemOptions
 	/**
 	 * An array whose elements are arrays containing an error code
 	 * and a retry interval in millis.\
-	 * If `expirationPeriod` property has been set to a positive value and a request fails, then, if the respective error code has a positive
+	 * If {@linkcode FhemClient.expirationPeriod} property has been set to a positive value and a request fails, then, if the respective error code has a positive
 	 * retry interval, it will be reissued after the specified time until it succeeds or expires.\
 	 * Some errors already have a default retry interval; you can use this parameter to override defaults and to set retry intervals
 	 * for errors that do not have a default one.
@@ -238,7 +238,10 @@ class FhemClient
 	private client: typeof http | typeof https;
 
 	/**
-	 * Time in millis after which to discard a failed request.
+	 * Time in millis after which to discard a failed request.\
+	 * If this has been set to a positive value and a request fails, then, if the respective error code has a positive
+	 * retry interval, it will be reissued after the specified time until it succeeds or `expirationPeriod` is exceeded.\
+	 * If set to 0 (the default), a failed request will be discarded immediately and an `Error` will be thrown.
 	 * See property {@linkcode Options.retryIntervals} of `options` param of {@linkcode FhemClient.constructor}.
 	 */
 	expirationPeriod = 0;
