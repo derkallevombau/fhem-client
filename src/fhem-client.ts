@@ -360,17 +360,6 @@ class FhemClient
 	 */
 	callFn(name: string, functionName: string, passDevHash?: boolean, functionReturnsHash?: boolean, ...args: (string | number)[]): Promise<string | number | void | (string | number)[] | Map<string | number, string | number>>
 	{
-		// 'callAndRetry' calls the provided method via 'apply', so there is no problem.
-		// eslint-disable-next-line @typescript-eslint/unbound-method
-		return this.callAndRetry(this.callFn_, name, functionName, passDevHash, functionReturnsHash, ...args);
-	}
-
-	/**
-	 * Actual 'callFn' before implementing retry feature.
-	 * @internal
-	 */
-	private callFn_(name: string, functionName: string, passDevHash?: boolean, functionReturnsHash?: boolean, ...args: (string | number)[])
-	{
 		const logger = this.logger;
 
 		// N.B.: 'const error = this.error;' doesn't work for methods referring to 'this'
@@ -478,9 +467,7 @@ class FhemClient
 	 */
 	execPerlCode(code: string): Promise<string | number | void>
 	{
-		// 'callAndRetry' calls the provided method via 'apply', so there is no problem.
-		// eslint-disable-next-line @typescript-eslint/unbound-method
-		return this.callAndRetry(this.execPerlCode_, code, false);
+		return this.execPerlCode_(code, false);
 	}
 
 	/** @internal */
@@ -490,7 +477,9 @@ class FhemClient
 		// since the method called by the user has already created a log entry.
 		this.logger.log(calledInternally ? 'debug' : 'info', `execPerlCode: Executing '${code}'...`);
 
-		return this.execCmd_(`{ ${code} }`, true);
+		// 'callAndRetry' calls the provided method via 'apply', so there is no problem.
+		// eslint-disable-next-line @typescript-eslint/unbound-method
+		return this.callAndRetry(this.execCmd_, `{ ${code} }`, true);
 	}
 
 	/**
