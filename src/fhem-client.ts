@@ -109,17 +109,17 @@ interface Logger
 interface FhemOptions
 {
 	/**
-	 * The URL of the desired FHEMWEB instance: 'http[s]://&lt;host&gt;:&lt;port&gt;/webname'.
+	 * The URL of the desired FHEMWEB device: 'http[s]://&lt;host&gt;:&lt;port&gt;/webname'.
 	 */
 	url: string;
 
 	/**
-	 * Must be supplied if you have enabled Basic Auth for the respective FHEMWEB instance.
+	 * Must be supplied if you have enabled Basic Auth for the respective FHEMWEB device.
 	 */
 	username: string;
 
 	/**
-	 * Must be supplied if you have enabled Basic Auth for the respective FHEMWEB instance.
+	 * Must be supplied if you have enabled Basic Auth for the respective FHEMWEB device.
 	 */
 	password: string;
 }
@@ -128,16 +128,16 @@ interface Options extends FhemOptions
 {
 	/**
 	 * An object for specifying options for the agent to be used for the requests
-	 * (See [Node.js API doc](https://nodejs.org/api/http.html#http_new_agent_options)).\
-	 * Defaults to `{ keepAlive: true }`.\
+	 * (See [Node.js API doc](https://nodejs.org/docs/latest-v14.x/api/http.html#http_new_agent_options)).\
+	 * Defaults to `{ keepAlive: true, maxSockets: 1 }`.\
 	 * If you specify additional options, they will be merged with the defaults.\
 	 * If you specify an option that has a default value, your value will override the default.
 	 */
 	agentOptions?: http.AgentOptions | https.AgentOptions;
 
 	/**
-	 * An object for specifying request options for http[s].get (See [Node.js API doc](https://nodejs.org/api/https.html#https_https_request_url_options_callback)).\
-	 * Defaults to `{ rejectUnauthorized: false }`.\
+	 * An object for specifying request options for http[s].request (See [Node.js API doc](https://nodejs.org/docs/latest-v14.x/api/https.html#https_https_request_url_options_callback)).\
+	 * Defaults to `{ rejectUnauthorized: false }` in case of https to accept self-signed certificates, `{}` otherwise.\
 	 * If you specify additional options, they will be merged with the defaults.\
 	 * If you specify an option that has a default value, your value will override the default.\
 	 * If you specify a `timeout`, it will work as you would expect (i. e. throw an `Error` when a timeout occurs).
@@ -211,10 +211,10 @@ class FhemClient
 	private fhemOptions: FhemOptions;
 
 	/**
-	 * Request options for http[s].get.
+	 * Default request options for http[s].request.
 	 * @internal
 	 */
-	private getOptions: http.RequestOptions | https.RequestOptions = { rejectUnauthorized: false };
+	private reqOptions: http.RequestOptions | https.RequestOptions = { method: 'GET' };
 
 	/** @internal */
 	private retryIntervalFromCode = new Map(
@@ -236,6 +236,12 @@ class FhemClient
 	// https are modules.
 	/** @internal */
 	private client: typeof http | typeof https;
+
+	// For debugging only.
+	/** @internal */
+	private localPort: number;
+	/** @internal */
+	private lastSocket;
 
 	/**
 	 * Time in millis after which to discard a failed request.\
@@ -265,11 +271,14 @@ class FhemClient
 
 		// Merge user-provided get options with defaults and remove from 'options'.
 		// N.B.: If options.getOptions is undefined, it just won't contribute anyting ('{ ...undefined } === { }').
-		this.getOptions = { ...this.getOptions, ...options.getOptions };
+		this.reqOptions = { ...this.reqOptions, ...options.getOptions };
 		delete options.getOptions;
 
+		// If using SSL, accept self-signed certificate.
+		if (this.url.protocol === 'https:') (this.reqOptions as https.RequestOptions).rejectUnauthorized = false;
+
 		// Merge user-provided agent options with defaults and remove from 'options'.
-		const agentOptions = { keepAlive: true, ...options.agentOptions };
+		const agentOptions = { keepAlive: true, maxSockets: 1, ...options.agentOptions };
 		delete options.agentOptions;
 
 		// Merge user-provided retry intervals with defaults and remove from 'options'.
@@ -284,7 +293,7 @@ class FhemClient
 		this.client = this.url.protocol === 'https:' ? https : http; // Yes, Node.js forces the user to select the appropriate module.
 
 		// Create and set agent for requests
-		this.getOptions.agent = new this.client.Agent(agentOptions);
+		this.reqOptions.agent = new this.client.Agent(agentOptions);
 
 		if (options.username && options.password)
 		{
@@ -314,7 +323,7 @@ class FhemClient
 	 */
 	closeConnection(): void
 	{
-		(this.getOptions.agent as http.Agent).destroy();
+		(this.reqOptions.agent as http.Agent).destroy();
 
 		this.logger.info('closeConnection: Called Agent.destroy().');
 	}
@@ -424,7 +433,7 @@ class FhemClient
 				}
 				catch (e) // ret must be an error message from FHEM.
 				{
-					error(`callFn: Failed to invoke ${functionName} of FHEM device ${name}: ${ret}.`, 'CF_FHEMERR');
+					error(`callFn: Failed to invoke ${functionName} of FHEM device ${name}: ${ret as string}.`, 'CF_FHEMERR');
 				}
 
 				if (retArray.length === 1) return retArray[0];
@@ -499,6 +508,9 @@ class FhemClient
 	 */
 	execCmd(cmd: string): Promise<string | number | void>
 	{
+		// await this.execPerlCode('"FHEMWEB instances:\n" . join("\n", map { /WEB_+/ ? $_ : () } keys %defs)')
+		// 	.then(r => this.logger.debug(r));
+
 		// 'callAndRetry' calls the provided method via 'apply', so there is no problem.
 		// eslint-disable-next-line @typescript-eslint/unbound-method
 		return this.callAndRetry(this.execCmd_, cmd, false);
@@ -508,24 +520,8 @@ class FhemClient
 	private execCmd_(cmd: string, calledInternally: boolean): Promise<string | number>
 	{
 		const logger = this.logger;
-		const url    = this.url;
-		const error  = this.error.bind(this);
-
-		// No token => Obtain it and call this method again.
-		if (!url.searchParams.get('fwcsrf'))
-		{
-			logger.info('execCmd: We do not yet have a CSRF token, going to obtain it...');
-
-			return this.obtainCsrfToken()
-				.then(
-					token =>
-					{
-						if (token) url.searchParams.set('fwcsrf', token);
-
-						return this.execCmd_(cmd, calledInternally);
-					}
-				);
-		}
+		const url = this.url;
+		const error = this.error.bind(this);
 
 		// Log as debug if we have been called internally
 		// since the method called by the user has already created a log entry.
@@ -560,111 +556,54 @@ class FhemClient
 
 						break;
 					case 400: // No or invalid CSRF token when requesting execution of 'cmd'
-						if (url.searchParams.has('fwcsrf'))
+						if (!res.headers['x-fhem-csrftoken']) // We didn't get a token, but it is needed.
 						{
-							logger.info('execCmd: CSRF token no longer valid, updating token and reissuing request...');
+							error(`execCmd: Failed to execute FHEM command '${cmd}': Obviously, this FHEMWEB does use a CSRF token, but it doesn't send it.`, 'NOTOKEN', reject);
+						}
+						else // We got a token => Use it.
+						{
+							if (url.searchParams.has('fwcsrf'))
+							{
+								logger.info('execCmd: CSRF token no longer valid, updating token and reissuing request...');
+							}
+							else
+							{
+								logger.info('execCmd: CSRF token needed, reissuing request with token...');
+							}
 
-							// Set the new token which FHEM has sent us in the response...
+							// Workaround: Oddly, the socket isn't reused for the next request;
+							// instead, it is closed when FHEMWEB closes the connection after some time,
+							// so we destroy it for a new socket to be created immediately.
+							// N.B.: We are using just one socket. This workaround has to be applied merely one;
+							// subsequent requests will use the existing socket.
+							res.socket.destroy();
+
+							// Set the (new) token which FHEM has sent us in the response...
 							// N.B.: The elements of res.headers['foo'] are of type string[].
 							//       But since we know that the CSRF token is a single string,
 							//       we use a Type Assertion here.
 							url.searchParams.set('fwcsrf', res.headers['x-fhem-csrftoken'] as string);
 
-							// ...and call this method again.
-							this.execCmd_(cmd, calledInternally)
-								.then(
-									result => resolve(result),
-									e      => reject(e)
-								);
-						}
-						else // We didn't get a token, but it is needed.
-						{
-							error(`execCmd: Failed to execute FHEM command '${cmd}': Obviously, this FHEMWEB does use a CSRF token, but it doesn't send it.`, 'NOTOKEN', reject);
+							// ...and signal 'callAndRetry' to call this method again immediately
+							// by resolving the Promise with 'undefined'.
+							resolve(undefined);
+
 						}
 
 						break;
-					default:
-						this.handleStatusCode(res, `execCmd: Failed to execute FHEM command '${cmd}'`, reject);
-				}
-			}
-		);
-	}
+					case 401: // Authentication error
+						error(`execCmd: Failed to execute FHEM command '${cmd}': Wrong username or password.`, 'AUTH', reject);
 
-	/**
-	 * Obtains the CSRF token, if any, from FHEMWEB without causing a "FHEMWEB WEB CSRF error".
-	 * @returns A `Promise<string>` that will be\
-	 * resolved with the token or an empty string on success\
-	 * or rejected with one of the following errors.
-	 * @throws `Error` with code 'EFHEMCL_RES' in case of response error.
-	 * @throws `Error` with code 'EFHEMCL_ABRT' in case the response closed prematurely.
-	 * @throws `Error` with code 'EFHEMCL_TIMEDOUT' in case connecting timed out.
-	 * @throws `Error` with code 'EFHEMCL_CONNREFUSED' in case the connection has been refused.
-	 * @throws `Error` with code 'EFHEMCL_NETUNREACH' in case the network is unreachable.
-	 * @throws `Error` with code 'EFHEMCL_CONNRESET' in case the connection has been reset by peer.
-	 * @throws `Error` with code 'EFHEMCL_REQ' in case of a different request error.
-	 * @throws `Error` with code 'EFHEMCL_AUTH' in case of wrong username or password.
-	 * @throws `Error` with code 'EFHEMCL_WEBN' in case of a wrong FHEM 'webname'.
-	 * @internal
-	 */
-	private obtainCsrfToken()
-	{
-		const logger = this.logger;
-
-		assert(!this.url.searchParams.get('cmd'));
-
-		return this.getWithPromise<string>(
-			(res, resolve, reject) =>
-			{
-				// N.B.: The elements of res.headers['foo'] are of type string[].
-				//       But since we know that the CSRF token is a single string,
-				//       we use a Type Assertion here.
-				let token = res.headers['x-fhem-csrftoken'] as string;
-				if (!token) token = '';
-
-				switch (res.statusCode)
-				{
-					case 400: // No or invalid CSRF token when requesting execution of 'cmd', but we don't have a cmd here.
-						logger.warn('obtainCsrfToken: Got 400. This should not happen!');
-					// eslint-disable-next-line no-fallthrough
-					case 200: // A GET request with correct authentication and without 'cmd' and 'fwcsrf' params gives no error.
-						if (token) logger.debug('obtainCsrfToken: Succeeded.');
-						else logger.warn("obtainCsrfToken: No CSRF token received. Either this FHEMWEB doesn't use it, or it doesn't send it. We will see...");
-
-						resolve(token);
+						break;
+					case 302: // Found => Wrong webname
+						error(`execCmd: Failed to execute FHEM command '${cmd}': Wrong FHEM 'webname' in ${this.fhemOptions.url}.`, 'WEBN', reject);
 
 						break;
 					default:
-						this.handleStatusCode(res, 'obtainCsrfToken: Failed to get CSRF token', reject);
+						error(`execCmd: Failed to execute FHEM command '${cmd}': Status: ${res.statusCode}, message: '${res.statusMessage}'.`, '', reject);
 				}
 			}
 		);
-	}
-
-	/**
-	 * Used by `execCmd` and `obtainCsrfToken` for status codes
-	 * which can be handled in a common way.
-	 * @param res - The server response object.
-	 * @param messagePrefix - Prefix for error message.
-	 * @param reject - The function to reject the `Promise`.
-	 * @internal
-	 */
-	private handleStatusCode(res: http.IncomingMessage, messagePrefix: string, reject: (reason?: any) => void)
-	{
-		const error = this.error.bind(this);
-
-		switch (res.statusCode)
-		{
-			case 401: // Authentication error
-				error(`${messagePrefix}: Wrong username or password.`, 'AUTH', reject);
-
-				break;
-			case 302: // Found => Wrong webname
-				error(`${messagePrefix}: Wrong FHEM 'webname' in ${this.fhemOptions.url}.`, 'WEBN', reject);
-
-				break;
-			default:
-				error(`${messagePrefix}: Status: ${res.statusCode}, message: '${res.statusMessage}'.`, '', reject);
-		}
 	}
 
 	/**
@@ -674,7 +613,7 @@ class FhemClient
 	 * A callback that will be called on server response with the response object,\
 	 * as well as the two functions to `resolve` or `reject` the `Promise`.
 	 * @returns A `Promise<R>` that will be resolved by `processResponse` on success\
-	 * or rejected by `processResponse`, the request listener or the response listener\
+	 * or rejected by `processResponse`, the request 'error' listener or a response listener\
 	 * with one of the following errors.
 	 * @throws `Error` with code 'EFHEMCL_RES' in case of response error.
 	 * @throws `Error` with code 'EFHEMCL_ABRT' in case the response closed prematurely.
@@ -685,6 +624,7 @@ class FhemClient
 	 * @throws `Error` with code 'EFHEMCL_REQ' in case of a different request error.
 	 * @internal
 	 */
+	// N.B.: The specified return type causes a Promise<R> to be constructed.
 	private getWithPromise<R>(processResponse: (res: http.IncomingMessage, resolve: (value?: R) => void, reject: (reason?: any) => void) => void): Promise<R>
 	{
 		const logger = this.logger;
@@ -693,19 +633,23 @@ class FhemClient
 		return new Promise(
 			(resolve, reject) =>
 			{
-				const req = this.client.get(this.url, this.getOptions,
+				// Added type so it known inside the lambda.
+				const req: http.ClientRequest = this.client.request(this.url, this.reqOptions,
 					res =>
 					{
 						// Remove 'timeout' listener as soon as we receive a response.
 						req.removeAllListeners('timeout');
 
 						res.on('error',
-							e => error(`execCmd: Response error: Code: ${getErrorCode(e)}, message: ${e.message}`, 'RES', reject)
+							e => error(`getWithPromise: Response error: Code: ${getErrorCode(e)}, message: ${e.message}`, 'RES', reject)
 						).on('aborted',
-							() => error('execCmd: Response closed prematurely.', 'ABRT', reject)
+							() => error('getWithPromise: Response closed prematurely.', 'ABRT', reject)
 						).on('close',
-							() => logger.info('execCmd: Connection closed.')
+							() => logger.debug(`getWithPromise: Connection (local port ${this.localPort}) closed.`)
 						);
+
+						logger.debug(`getWithPromise: Server HTTP Version: ${res.httpVersion}`);
+						// logger.debug(`getWithPromise: Server response headers:\n${JSON.stringify(res.headers, undefined, 4)}`);
 
 						processResponse(res, resolve, reject);
 					}
@@ -717,19 +661,19 @@ class FhemClient
 						switch (code)
 						{
 							case 'ETIMEDOUT': // Either because of 'timeout' option or the built-in timeout.
-								error(`execCmd: Connecting to ${this.fhemOptions.url} timed out.`, 'TIMEDOUT', reject);
+								error(`getWithPromise: Connecting to ${this.fhemOptions.url} timed out.`, 'TIMEDOUT', reject);
 								break;
 							case 'ECONNREFUSED':
-								error(`execCmd: Connection to ${this.fhemOptions.url} refused.`, 'CONNREFUSED', reject);
+								error(`getWithPromise: Connection to ${this.fhemOptions.url} refused.`, 'CONNREFUSED', reject);
 								break;
 							case 'ENETUNREACH':
-								error(`execCmd: Cannot connect to ${this.fhemOptions.url}: Network is unreachable.`, 'NETUNREACH', reject);
+								error(`getWithPromise: Cannot connect to ${this.fhemOptions.url}: Network is unreachable.`, 'NETUNREACH', reject);
 								break;
 							case 'ECONNRESET':
-								error(`execCmd: Connection reset by ${this.url.host}. Check if '${this.url.protocol}' is the right protocol.`, 'CONNRESET', reject);
+								error(`getWithPromise: Connection reset by ${this.url.host}. Check if '${this.url.protocol}' is the right protocol.`, 'CONNRESET', reject);
 								break;
 							default:
-								error(`execCmd: Request failed: Code: ${code}, message: ${e.message}`, 'REQ', reject);
+								error(`getWithPromise: Request failed: Code: ${code}, message: ${e.message}`, 'REQ', reject);
 						}
 					}
 				).on('timeout',
@@ -740,17 +684,50 @@ class FhemClient
 						//       - This event is emitted even after the response has been received.
 						//       - This event will not be emitted after the 'error' event has been emitted.
 
-						logger.info('Aborting request because timeout value set by user exceeded.');
+						logger.info('getWithPromise: Aborting request because timeout value set by user exceeded.');
 
+						// This triggers the 'error' event with the appropriate error code.
 						req.destroy(new ErrorWithCode('', 'ETIMEDOUT'));
 					}
+				).on('socket',
+					socket =>
+					{
+						if (socket === this.lastSocket)
+						{
+							logger.debug(`getWithPromise: Reusing socket (local port ${socket.localPort}) from last request.`);
+						}
+						else // Add listeners only if this is a new socket.
+						{
+							socket.on('connect',
+								() =>
+								{
+									logger.debug(`getWithPromise: New socket (local port ${socket.localPort}) connected.`);
+
+									// Save localPort as this property will be undefined in 'close' event.
+									this.localPort = socket.localPort;
+
+									// It is sufficient to save the last socket since we restricted the max number
+									// of sockets to 1 via Agent option 'maxSockets'. TODO: Explain why this one socket may change!
+									this.lastSocket = socket;
+								}
+							).on('close',
+								() => logger.debug(`getWithPromise: Socket (local port ${this.localPort}) closed.`)
+							).on('end',
+								() => logger.debug(`getWithPromise: Socket (local port ${socket.localPort}): end.`)
+							);
+						}
+					}
 				);
+
+				// logger.debug(`getWithPromise: RequestHeaders:\n${JSON.stringify(req.getHeaders(), undefined, 4)}`);
+
+				req.end();
 			}
 		);
 	}
 
 	/**
-	 * Logs `message` as error, constructs an `Error` object with `message`
+	 * Logs `message` as error if it is a nonempty string, constructs an `Error` object with `message`
 	 * and `code` 'EFHEMCL_<codeSuff>'.\
 	 * Then, if `reject` function supplied, it is called with the `Error` object;\
 	 * otherwise, the `Error` is thrown.
@@ -761,7 +738,7 @@ class FhemClient
 	 */
 	private error(message: string, codeSuff: string, reject?: (reason?: any) => void)
 	{
-		this.logger.error(message);
+		if (message) this.logger.error(message);
 
 		const e = new ErrorWithCode(message, `EFHEMCL_${codeSuff}`);
 
@@ -784,20 +761,23 @@ class FhemClient
 	private async callAndRetry<A extends any[], R>(method: (...args: A) => Promise<R>, ...args: A)
 	{
 		const expirationTime = this.expirationPeriod > 0 ? Date.now() + this.expirationPeriod : undefined;
-		let retryInterval: number;
-		let retry = false;
-		let result: void | R; // void because the catch callback doesn't return anything.
+		let retry: boolean;
 
 		do
 		{
+			let retryInterval: number;
+			let noSleep = false;
+
+			retry = false;
+
 			// 'apply' is similar to 'bind', but instead of returning a bound function
 			// that can be called later on, it calls the function immediately and returns
 			// the result.
-			result = await method.apply(this, args)
+			const result = await method.apply(this, args)
 				.catch(
 					e =>
 					{
-						assert(e instanceof ErrorWithCode);
+						assert(e instanceof ErrorWithCode, `Library error: ${(e as Error).stack}`);
 
 						// Thanks to “assertion signatures” (since TS 3.7; see declaration of Node.js' assert function),
 						// e: any is treated as ErrorWithCode by TS for the rest of the scope.
@@ -818,7 +798,15 @@ class FhemClient
 					}
 				);
 
-			if (retry) await sleep(retryInterval);
+			if (result === undefined)
+			{
+				noSleep = retry = true;
+			}
+
+			if (retry)
+			{
+				if (!noSleep) await sleep(retryInterval);
+			}
 			else return result;
 		}
 		while (retry);
