@@ -12,15 +12,13 @@
  *         - Property {@linkcode Options.retryIntervals} of `options` param of {@linkcode FhemClient.constructor}.
  *         - Property {@linkcode FhemClient.expirationPeriod}
  *     - Specify agent options via property {@linkcode Options.agentOptions} of `options` param of
- *       {@linkcode FhemClient.constructor}.\
- *       Especially useful to simply disable `keepAlive` instead of using the `Connection` header.
- *     - New method `closeConnection` to destroy any sockets that are currently in use by the agent
- *       in case `keepAlive` is enabled.
+ *       {@linkcode FhemClient.constructor}.<br>
+ *     - Uses the same socket for each request.
  *     - Type definitions (.d.ts) included.
  *     - Completely rewritten in TypeScript, targeting ES2020.
  * - 0.1.2: Specify request options for http[s].get via property {@linkcode Options.getOptions} of
- *   `options` param of {@linkcode FhemClient.constructor}.\
- *   Especially useful to set a request timeout. There is a built-in timeout, but that's pretty long.\
+ *   `options` param of {@linkcode FhemClient.constructor}.<br>
+ *   Especially useful to set a request timeout. There is a built-in timeout, but that's pretty long.<br>
  *   FYI: Setting RequestOptions.timeout merely generates an event when the specified time has elapsed,
  *   but we actually abort the request.
  * - 0.1.1: Added specific error codes instead of just 'EFHEMCL'.
@@ -36,7 +34,7 @@
  * const FhemClient = require('fhem-client');
  * ```
  * ### Usage
- * ```js
+ * ```typescript
  * const fhemClient = new FhemClient(
  * 	{
  * 		url: 'https://localhost:8083/fhem',
@@ -48,21 +46,26 @@
  *
  * fhemClient.expirationPeriod = 20000;
  *
- * fhemClient.execPerlCode('join("\n", map("Device: $_, type: $defs{$_}{TYPE}", keys %defs))')
- * 	.then(
- * 		result => console.log(`Your devices:\n${result as string}`),
- * 		e      => console.log(`Error: Message: ${(e as Error).message}, code: ${(e as Error)['code'] as string}`)
- * 		// Notice: In plain JS, or in TS with '// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/restrict-template-expressions'
- * 		// (in case you are using @typescript-eslint), you can just write 'console.log(`Error: Message: ${e.message}, code: ${e.code}`)'.
- * 	);
+ * async function example()
+ * {
+ * 	await fhemClient.execPerlCode('join("\n", map("Device: $_, type: $defs{$_}{TYPE}", keys %defs))')
+ * 		.then(
+ * 			result => console.log(`Your devices:\n${result as string}`),
+ * 			// This is correct TS code:
+ * 			e => console.log(`Error: Message: ${(e as Error).message}, code: ${(e as Error)['code'] as string}`)
+ * 		);
  *
- * fhemClient.execCmd('get hub currentActivity')
- * 	.then(
- * 		result => console.log('Current activity:', result),
- * 		e      => console.log(`Error: Message: ${(e as Error).message}, code: ${(e as Error)['code'] as string}`)
- * 	).finally(
- * 		() => fhemClient.closeConnection()
- * 	);
+ * 	await fhemClient.execCmd('get hub currentActivity')
+ * 		.then(
+ * 			result => console.log('Current activity:', result),
+ * 			// Like above, but in plain JS.
+ * 			// You may also write it like this in TS with the following directive for @typescript-eslint, in case you are using it:
+ * 			// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/restrict-template-expressions
+ * 			e => console.log(`Error: Message: ${e.message}, code: ${e.code}`)
+ * 		);
+ * }
+ *
+ * void example()
  * ```
  * @packageDocumentation
  */
@@ -82,30 +85,30 @@ interface Logger {
 }
 interface FhemOptions {
     /**
-     * The URL of the desired FHEMWEB instance: 'http[s]://&lt;host&gt;:&lt;port&gt;/webname'.
+     * The URL of the desired FHEMWEB device: 'http[s]://&lt;host&gt;:&lt;port&gt;/webname'.
      */
     url: string;
     /**
-     * Must be supplied if you have enabled Basic Auth for the respective FHEMWEB instance.
+     * Must be supplied if you have enabled Basic Auth for the respective FHEMWEB device.
      */
     username: string;
     /**
-     * Must be supplied if you have enabled Basic Auth for the respective FHEMWEB instance.
+     * Must be supplied if you have enabled Basic Auth for the respective FHEMWEB device.
      */
     password: string;
 }
 interface Options extends FhemOptions {
     /**
      * An object for specifying options for the agent to be used for the requests
-     * (See [Node.js API doc](https://nodejs.org/api/http.html#http_new_agent_options)).\
-     * Defaults to `{ keepAlive: true }`.\
+     * (See [Node.js API doc](https://nodejs.org/docs/latest-v14.x/api/http.html#http_new_agent_options)).\
+     * Defaults to `{ keepAlive: true, maxSockets: 1 }`.\
      * If you specify additional options, they will be merged with the defaults.\
      * If you specify an option that has a default value, your value will override the default.
      */
     agentOptions?: http.AgentOptions | https.AgentOptions;
     /**
-     * An object for specifying request options for http[s].get (See [Node.js API doc](https://nodejs.org/api/https.html#https_https_request_url_options_callback)).\
-     * Defaults to `{ rejectUnauthorized: false }`.\
+     * An object for specifying request options for http[s].request (See [Node.js API doc](https://nodejs.org/docs/latest-v14.x/api/https.html#https_https_request_url_options_callback)).\
+     * Defaults to `{ rejectUnauthorized: false }` in case of https to accept self-signed certificates, `{}` otherwise.\
      * If you specify additional options, they will be merged with the defaults.\
      * If you specify an option that has a default value, your value will override the default.\
      * If you specify a `timeout`, it will work as you would expect (i. e. throw an `Error` when a timeout occurs).
@@ -148,14 +151,6 @@ declare class FhemClient {
      * @throws `Error` with code 'EFHEMCL_INVLURL' in case `options.url` is not a valid url string.
      */
     constructor(options: Options, logger?: Logger);
-    /**
-     * If you have enabled `keepAlive` (the default), call this method when you do not
-     * need to make any further requests.\
-     * This will destroy any sockets that are currently in use by the agent.\
-     * If you miss calling this method, your program will keep running until the server
-     * terminates the connection.
-     */
-    closeConnection(): void;
     /**
      * Request FHEMWEB to call a registered module function. This method corresponds to FHEM's Perl function 'CallFn'.
      * @param name - The name of the device to call the function for.
