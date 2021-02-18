@@ -1,14 +1,25 @@
 A small Promise-based client for executing FHEM commands via FHEMWEB, supporting SSL, Basic Auth and CSRF Token.\
 Uses Node.js http or https module, depending on the protocol specified in the URL; no further dependencies.
 
+It provides the methods `execCmd`, `execPerlCode` and `callFn` to interact with FHEM.\
+See the [full documentation](https://derkallevombau.github.io/fhem-client/) for details.
+
 ## Changelog
 - 0.1.4:
     - Retry on error via
         - Property `Options.retryIntervals` of `options` param of `FhemClient.constructor`.
         - Property `FhemClient.expirationPeriod`
+    - Specify agent options via property `Options.agentOptions` of `options` param of
+      `FhemClient.constructor`.<br>
+    - Uses the same socket for each request.
     - Type definitions (.d.ts) included.
     - Completely rewritten in TypeScript, targeting ES2020.
-- 0.1.2: Specify options for http[s].get via property `Options.getOptions` of `options` param of `FhemClient.constructor`.
+- 0.1.2: Specify request options for http[s].get via property `Options.getOptions` of
+  `options` param of `FhemClient.constructor`.<br>
+  Especially useful to set a request timeout. There is a built-in timeout, but that's pretty long.<br>
+  FYI: Setting RequestOptions.timeout merely generates an event when the specified time has elapsed,
+  but we actually abort the request.
+- 0.1.1: Added specific error codes instead of just 'EFHEMCL'.
 
 ## Example
 ### Import
@@ -21,25 +32,35 @@ import FhemClient = require('fhem-client');
 const FhemClient = require('fhem-client');
 ```
 ### Usage
-```js
+```typescript
 const fhemClient = new FhemClient(
     {
         url: 'https://localhost:8083/fhem',
         username: 'thatsme',
         password: 'topsecret',
-        getOptions: { timeout: 5000 }
+        getOptions: { timeout: 2000 }
     }
 );
 
-fhemClient.expirationPeriod = 10000;
+fhemClient.expirationPeriod = 20000;
 
-fhemClient.execCmd('set lamp on').then(
-    () => console.log('Succeeded'),
-    e  => console.log(`Error: Message: ${e.message}, code: ${e.code}`)
-);
+async function example()
+{
+    await fhemClient.execPerlCode('join("\n", map("Device: $_, type: $defs{$_}{TYPE}", keys %defs))')
+        .then(
+            result => console.log(`Your devices:\n${result as string}`),
+            // This is correct TS code:
+            e => console.log(`Error: Message: ${(e as Error).message}, code: ${(e as Error)['code'] as string}`)
+        );
+    await fhemClient.execCmd('get hub currentActivity')
+        .then(
+            result => console.log('Current activity:', result),
+            // Like above, but in plain JS.
+            // You may also write it like this in TS with the following directive for @typescript-eslint, in case you are using it:
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/restrict-template-expressions
+            e => console.log(`Error: Message: ${e.message}, code: ${e.code}`)
+        );
+}
 
-fhemClient.execCmd('get hub currentActivity').then(
-    result => console.log('Current activity:', result),
-    e      => console.log(`Error: Message: ${e.message}, code: ${e.code}`)
-);
+void example()
 ```
