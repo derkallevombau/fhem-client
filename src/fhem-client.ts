@@ -31,9 +31,7 @@
  *         - Property {@linkcode FhemClient.expirationPeriod}
  *     - Specify agent options via property {@linkcode Options.agentOptions} of `options` param of
  *       {@linkcode FhemClient.constructor}.<br>
- *       Especially useful to simply disable `keepAlive` instead of using the `Connection` header.
- *     - New method `closeConnection` to destroy any sockets that are currently in use by the agent
- *       in case `keepAlive` is enabled.
+ *     - Uses the same socket for each request.
  *     - Type definitions (.d.ts) included.
  *     - Completely rewritten in TypeScript, targeting ES2020.
  * - 0.1.2: Specify request options for http[s].get via property {@linkcode Options.getOptions} of
@@ -66,24 +64,26 @@
  *
  * fhemClient.expirationPeriod = 20000;
  *
- * // Please note: In plain JS, or in TS with
- * // '// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/restrict-template-expressions'
- * // (in case you are using @typescript-eslint),
- * // you can just write 'console.log(`Error: Message: ${e.message}, code: ${e.code}`)'.
+ * async function example()
+ * {
+ * 	await fhemClient.execPerlCode('join("\n", map("Device: $_, type: $defs{$_}{TYPE}", keys %defs))')
+ * 		.then(
+ * 			result => console.log(`Your devices:\n${result as string}`),
+ * 			// This is correct TS code:
+ * 			e => console.log(`Error: Message: ${(e as Error).message}, code: ${(e as Error)['code'] as string}`)
+ * 		);
  *
- * fhemClient.execPerlCode('join("\n", map("Device: $_, type: $defs{$_}{TYPE}", keys %defs))')
- * 	.then(
- * 		result => console.log(`Your devices:\n${result as string}`),
- * 		e      => console.log(`Error: Message: ${(e as Error).message}, code: ${(e as Error)['code'] as string}`)
- * 	);
+ * 	await fhemClient.execCmd('get hub currentActivity')
+ * 		.then(
+ * 			result => console.log('Current activity:', result),
+ * 			// Like above, but in plain JS.
+ * 			// You may also write it like this in TS with the following directive for @typescript-eslint, in case you are using it:
+ * 			// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/restrict-template-expressions
+ * 			e => console.log(`Error: Message: ${e.message}, code: ${e.code}`)
+ * 		);
+ * }
  *
- * fhemClient.execCmd('get hub currentActivity')
- * 	.then(
- * 		result => console.log('Current activity:', result),
- * 		e      => console.log(`Error: Message: ${(e as Error).message}, code: ${(e as Error)['code'] as string}`)
- * 	).finally(
- * 		() => fhemClient.closeConnection()
- * 	);
+ * void example()
  * ```
  * @packageDocumentation
  */
