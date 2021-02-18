@@ -108,7 +108,7 @@
 					<div class="tsd-comment tsd-typography">
 						<div class="lead">
 							<p>An object for specifying options for the agent to be used for the requests
-							(See <a href="https://nodejs.org/api/http.html#http_new_agent_options">Node.js API doc</a>).<br>Defaults to <code>{ keepAlive: true }</code>.<br>If you specify additional options, they will be merged with the defaults.<br>If you specify an option that has a default value, your value will override the default.</p>
+							(See <a href="https://nodejs.org/docs/latest-v14.x/api/http.html#http_new_agent_options">Node.js API doc</a>).<br>Defaults to <code>{ keepAlive: true, maxSockets: 1 }</code>.<br>If you specify additional options, they will be merged with the defaults.<br>If you specify an option that has a default value, your value will override the default.</p>
 						</div>
 					</div>
 				</section>
@@ -120,7 +120,7 @@
 					</aside>
 					<div class="tsd-comment tsd-typography">
 						<div class="lead">
-							<p>An object for specifying request options for http[s].get (See <a href="https://nodejs.org/api/https.html#https_https_request_url_options_callback">Node.js API doc</a>).<br>Defaults to <code>{ rejectUnauthorized: false }</code>.<br>If you specify additional options, they will be merged with the defaults.<br>If you specify an option that has a default value, your value will override the default.<br>If you specify a <code>timeout</code>, it will work as you would expect (i. e. throw an <code>Error</code> when a timeout occurs).</p>
+							<p>An object for specifying request options for http[s].request (See <a href="https://nodejs.org/docs/latest-v14.x/api/https.html#https_https_request_url_options_callback">Node.js API doc</a>).<br>Defaults to <code>{ rejectUnauthorized: false }</code> in case of https to accept self-signed certificates, <code>{}</code> otherwise.<br>If you specify additional options, they will be merged with the defaults.<br>If you specify an option that has a default value, your value will override the default.<br>If you specify a <code>timeout</code>, it will work as you would expect (i. e. throw an <code>Error</code> when a timeout occurs).</p>
 						</div>
 					</div>
 				</section>
@@ -133,14 +133,14 @@
 					</aside>
 					<div class="tsd-comment tsd-typography">
 						<div class="lead">
-							<p>Must be supplied if you have enabled Basic Auth for the respective FHEMWEB instance.</p>
+							<p>Must be supplied if you have enabled Basic Auth for the respective FHEMWEB device.</p>
 						</div>
 					</div>
 				</section>
 				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-interface tsd-is-not-exported">
 					<a name="retryintervals" class="tsd-anchor"></a>
 					<h3><span class="tsd-flag ts-flagOptional">Optional</span> retry<wbr>Intervals</h3>
-					<div class="tsd-signature tsd-kind-icon">retry<wbr>Intervals<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">[</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">, </span><span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">]</span><span class="tsd-signature-symbol">[]</span></div>
+					<div class="tsd-signature tsd-kind-icon">retry<wbr>Intervals<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">[</span><span class="tsd-signature-symbol">]</span><span class="tsd-signature-symbol">[]</span></div>
 					<aside class="tsd-sources">
 					</aside>
 					<div class="tsd-comment tsd-typography">
@@ -171,7 +171,7 @@
 					</aside>
 					<div class="tsd-comment tsd-typography">
 						<div class="lead">
-							<p>The URL of the desired FHEMWEB instance: &#39;http[s]://&lt;host&gt;:&lt;port&gt;/webname&#39;.</p>
+							<p>The URL of the desired FHEMWEB device: &#39;http[s]://&lt;host&gt;:&lt;port&gt;/webname&#39;.</p>
 						</div>
 					</div>
 				</section>
@@ -184,7 +184,7 @@
 					</aside>
 					<div class="tsd-comment tsd-typography">
 						<div class="lead">
-							<p>Must be supplied if you have enabled Basic Auth for the respective FHEMWEB instance.</p>
+							<p>Must be supplied if you have enabled Basic Auth for the respective FHEMWEB device.</p>
 						</div>
 					</div>
 				</section>
@@ -257,6 +257,5 @@
 </div>
 <div class="overlay"></div>
 <script src="../assets/js/main.js"></script>
-<script>if (location.protocol == 'file:') document.write('<script src="../assets/js/search.js"><' + '/script>');</script>
 </body>
 </html>

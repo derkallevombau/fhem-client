@@ -80,17 +80,15 @@
 									</ul>
 								</li>
 								<li>Specify agent options via property <a href="interfaces/_fhem_client_.options.html#agentoptions"><code>Options.agentOptions</code></a> of <code>options</code> param of
-									<a href="classes/_fhem_client_.fhemclient.html#constructor"><code>FhemClient.constructor</code></a>.\
-								Especially useful to simply disable <code>keepAlive</code> instead of using the <code>Connection</code> header.</li>
-								<li>New method <code>closeConnection</code> to destroy any sockets that are currently in use by the agent
-								in case <code>keepAlive</code> is enabled.</li>
+								<a href="classes/_fhem_client_.fhemclient.html#constructor"><code>FhemClient.constructor</code></a>.<br></li>
+								<li>Uses the same socket for each request.</li>
 								<li>Type definitions (.d.ts) included.</li>
 								<li>Completely rewritten in TypeScript, targeting ES2020.</li>
 							</ul>
 						</li>
 						<li>0.1.2: Specify request options for http[s].get via property <a href="interfaces/_fhem_client_.options.html#getoptions"><code>Options.getOptions</code></a> of
-							<code>options</code> param of <a href="classes/_fhem_client_.fhemclient.html#constructor"><code>FhemClient.constructor</code></a>.\
-							Especially useful to set a request timeout. There is a built-in timeout, but that&#39;s pretty long.\
+							<code>options</code> param of <a href="classes/_fhem_client_.fhemclient.html#constructor"><code>FhemClient.constructor</code></a>.<br>
+							Especially useful to set a request timeout. There is a built-in timeout, but that&#39;s pretty long.<br>
 							FYI: Setting RequestOptions.timeout merely generates an event when the specified time has elapsed,
 						but we actually abort the request.</li>
 						<li>0.1.1: Added specific error codes instead of just &#39;EFHEMCL&#39;.</li>
@@ -112,7 +110,7 @@
 					<a href="#usage" id="usage" style="color: inherit; text-decoration: none;">
 						<h3>Usage</h3>
 					</a>
-					<pre><code class="language-js"><span class="hljs-keyword">const</span> fhemClient = <span class="hljs-keyword">new</span> FhemClient(
+					<pre><code class="language-typescript"><span class="hljs-keyword">const</span> fhemClient = <span class="hljs-keyword">new</span> FhemClient(
     {
         <span class="hljs-attr">url</span>: <span class="hljs-string">&#x27;https://localhost:8083/fhem&#x27;</span>,
         <span class="hljs-attr">username</span>: <span class="hljs-string">&#x27;thatsme&#x27;</span>,
@@ -123,21 +121,26 @@
 
 fhemClient.expirationPeriod = <span class="hljs-number">20000</span>;
 
-fhemClient.execPerlCode(<span class="hljs-string">&#x27;join(&quot;\n&quot;, map(&quot;Device: $_, type: $defs{$_}{TYPE}&quot;, keys %defs))&#x27;</span>)
-    .then(
-        <span class="hljs-function"><span class="hljs-params">result</span> =&gt;</span> <span class="hljs-built_in">console</span>.log(<span class="hljs-string">`Your devices:\n<span class="hljs-subst">${result <span class="hljs-keyword">as</span> string}</span>`</span>),
-        <span class="hljs-function"><span class="hljs-params">e</span>      =&gt;</span> <span class="hljs-built_in">console</span>.log(<span class="hljs-string">`Error: Message: <span class="hljs-subst">${(e <span class="hljs-keyword">as</span> <span class="hljs-built_in">Error</span>).message}</span>, code: <span class="hljs-subst">${(e <span class="hljs-keyword">as</span> <span class="hljs-built_in">Error</span>)[<span class="hljs-string">&#x27;code&#x27;</span>] <span class="hljs-keyword">as</span> string}</span>`</span>)
-        <span class="hljs-comment">// Notice: In plain JS, or in TS with &#x27;// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/restrict-template-expressions&#x27;</span>
-        <span class="hljs-comment">// (in case you are using @typescript-eslint), you can just write &#x27;console.log(`Error: Message: ${e.message}, code: ${e.code}`)&#x27;.</span>
-    );
+<span class="hljs-keyword">async</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">example</span>(<span class="hljs-params"></span>)
+</span>{
+    <span class="hljs-keyword">await</span> fhemClient.execPerlCode(<span class="hljs-string">&#x27;join(&quot;\n&quot;, map(&quot;Device: $_, type: $defs{$_}{TYPE}&quot;, keys %defs))&#x27;</span>)
+        .then(
+            <span class="hljs-function"><span class="hljs-params">result</span> =&gt;</span> <span class="hljs-built_in">console</span>.log(<span class="hljs-string">`Your devices:\n<span class="hljs-subst">${result <span class="hljs-keyword">as</span> <span class="hljs-built_in">string</span>}</span>`</span>),
+            <span class="hljs-comment">// This is correct TS code:</span>
+            <span class="hljs-function"><span class="hljs-params">e</span> =&gt;</span> <span class="hljs-built_in">console</span>.log(<span class="hljs-string">`Error: Message: <span class="hljs-subst">${(e <span class="hljs-keyword">as</span> <span class="hljs-built_in">Error</span>).message}</span>, code: <span class="hljs-subst">${(e <span class="hljs-keyword">as</span> <span class="hljs-built_in">Error</span>)[<span class="hljs-string">&#x27;code&#x27;</span>] <span class="hljs-keyword">as</span> <span class="hljs-built_in">string</span>}</span>`</span>)
+        );
 
-fhemClient.execCmd(<span class="hljs-string">&#x27;get hub currentActivity&#x27;</span>)
-    .then(
-        <span class="hljs-function"><span class="hljs-params">result</span> =&gt;</span> <span class="hljs-built_in">console</span>.log(<span class="hljs-string">&#x27;Current activity:&#x27;</span>, result),
-        <span class="hljs-function"><span class="hljs-params">e</span>      =&gt;</span> <span class="hljs-built_in">console</span>.log(<span class="hljs-string">`Error: Message: <span class="hljs-subst">${(e <span class="hljs-keyword">as</span> <span class="hljs-built_in">Error</span>).message}</span>, code: <span class="hljs-subst">${(e <span class="hljs-keyword">as</span> <span class="hljs-built_in">Error</span>)[<span class="hljs-string">&#x27;code&#x27;</span>] <span class="hljs-keyword">as</span> string}</span>`</span>)
-    ).finally(
-        <span class="hljs-function">() =&gt;</span> fhemClient.closeConnection()
-    );</code></pre>
+    <span class="hljs-keyword">await</span> fhemClient.execCmd(<span class="hljs-string">&#x27;get hub currentActivity&#x27;</span>)
+        .then(
+            <span class="hljs-function"><span class="hljs-params">result</span> =&gt;</span> <span class="hljs-built_in">console</span>.log(<span class="hljs-string">&#x27;Current activity:&#x27;</span>, result),
+            <span class="hljs-comment">// Like above, but in plain JS.</span>
+            <span class="hljs-comment">// You may also write it like this in TS with the following directive for @typescript-eslint, in case you are using it:</span>
+            <span class="hljs-comment">// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/restrict-template-expressions</span>
+            <span class="hljs-function"><span class="hljs-params">e</span> =&gt;</span> <span class="hljs-built_in">console</span>.log(<span class="hljs-string">`Error: Message: <span class="hljs-subst">${e.message}</span>, code: <span class="hljs-subst">${e.code}</span>`</span>)
+        );
+}
+
+<span class="hljs-built_in">void</span> example()</code></pre>
 				</div>
 			</section>
 			<section class="tsd-panel-group tsd-index-group">
@@ -203,6 +206,5 @@ fhemClient.execCmd(<span class="hljs-string">&#x27;get hub currentActivity&#x27;
 </div>
 <div class="overlay"></div>
 <script src="assets/js/main.js"></script>
-<script>if (location.protocol == 'file:') document.write('<script src="assets/js/search.js"><' + '/script>');</script>
 </body>
 </html>
