@@ -91,8 +91,7 @@
 import * as http from 'http';
 import * as https from 'https';
 import { URL } from 'url';
-/** @ignore */ // Listed as variable by typedoc.
-import assert = require('assert');
+import { strict as assert } from 'assert';
 
 /** @ignore */
 type LogMethod = (level: string, ...args: any[]) => void;
