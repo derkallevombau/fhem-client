@@ -71,18 +71,7 @@
  */
 import * as http from 'http';
 import * as https from 'https';
-/** @ignore */
-declare type LogMethod = (level: string, ...args: any[]) => void;
-/** @ignore */
-declare type LoggerLevelMethod = (message: any, ...args: any[]) => void;
-/** @ignore */
-interface Logger {
-    log: LogMethod;
-    debug: LoggerLevelMethod;
-    info: LoggerLevelMethod;
-    warn: LoggerLevelMethod;
-    error: LoggerLevelMethod;
-}
+import Logger from 'src/logger-iface';
 interface FhemOptions {
     /**
      * The URL of the desired FHEMWEB device: 'http[s]://&lt;host&gt;:&lt;port&gt;/webname'.
