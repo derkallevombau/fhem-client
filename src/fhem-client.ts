@@ -93,20 +93,7 @@ import * as https from 'https';
 import { URL } from 'url';
 import { strict as assert } from 'assert';
 
-/** @ignore */
-type LogMethod = (level: string, ...args: any[]) => void;
-/** @ignore */
-type LoggerLevelMethod = (message: any, ...args: any[]) => void;
-
-/** @ignore */
-interface Logger
-{
-	log  : LogMethod;
-	debug: LoggerLevelMethod;
-	info : LoggerLevelMethod;
-	warn : LoggerLevelMethod;
-	error: LoggerLevelMethod;
-}
+import Logger from 'src/logger-iface';
 
 interface FhemOptions
 {
