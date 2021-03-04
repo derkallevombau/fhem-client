@@ -3,8 +3,8 @@
 <head>
 	<meta charset="utf-8">
 	<meta http-equiv="X-UA-Compatible" content="IE=edge">
-	<title>&quot;fhem-client&quot; | fhem-client - v0.1.4</title>
-	<meta name="description" content="Documentation for fhem-client - v0.1.4">
+	<title>&quot;fhem-client&quot; | fhem-client - v0.1.5</title>
+	<meta name="description" content="Documentation for fhem-client - v0.1.5">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<link rel="stylesheet" href="assets/css/main.css">
 </head>
@@ -22,7 +22,7 @@
 						<li class="state loading">Preparing search index...</li>
 						<li class="state failure">The search index is not available</li>
 					</ul>
-					<a href="index.html" class="title">fhem-client - v0.1.4</a>
+					<a href="index.html" class="title">fhem-client - v0.1.5</a>
 				</div>
 				<div class="table-cell" id="tsd-widgets">
 					<div id="tsd-filter">
@@ -73,6 +73,7 @@
 						<h2>Changelog</h2>
 					</a>
 					<ul>
+						<li>0.1.5: <a href="classes/_fhem_client_.fhemclient.html#callfn"><code>FhemClient.callFn</code></a> now accepts <code>boolean</code> args.</li>
 						<li>0.1.4:<ul>
 								<li>Retry on error via<ul>
 										<li>Property <a href="interfaces/_fhem_client_.options.html#retryintervals"><code>Options.retryIntervals</code></a> of <code>options</code> param of <a href="classes/_fhem_client_.fhemclient.html#constructor"><code>FhemClient.constructor</code></a>.</li>
@@ -123,21 +124,26 @@ fhemClient.expirationPeriod = <span class="hljs-number">20000</span>;
 
 <span class="hljs-keyword">async</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">example</span>(<span class="hljs-params"></span>)
 </span>{
-    <span class="hljs-keyword">await</span> fhemClient.execPerlCode(<span class="hljs-string">&#x27;join(&quot;\n&quot;, map(&quot;Device: $_, type: $defs{$_}{TYPE}&quot;, keys %defs))&#x27;</span>)
-        .then(
-            <span class="hljs-function"><span class="hljs-params">result</span> =&gt;</span> <span class="hljs-built_in">console</span>.log(<span class="hljs-string">`Your devices:\n<span class="hljs-subst">${result <span class="hljs-keyword">as</span> <span class="hljs-built_in">string</span>}</span>`</span>),
-            <span class="hljs-comment">// This is correct TS code:</span>
-            <span class="hljs-function"><span class="hljs-params">e</span> =&gt;</span> <span class="hljs-built_in">console</span>.log(<span class="hljs-string">`Error: Message: <span class="hljs-subst">${(e <span class="hljs-keyword">as</span> <span class="hljs-built_in">Error</span>).message}</span>, code: <span class="hljs-subst">${(e <span class="hljs-keyword">as</span> <span class="hljs-built_in">Error</span>)[<span class="hljs-string">&#x27;code&#x27;</span>] <span class="hljs-keyword">as</span> <span class="hljs-built_in">string</span>}</span>`</span>)
-        );
-
     <span class="hljs-keyword">await</span> fhemClient.execCmd(<span class="hljs-string">&#x27;get hub currentActivity&#x27;</span>)
         .then(
             <span class="hljs-function"><span class="hljs-params">result</span> =&gt;</span> <span class="hljs-built_in">console</span>.log(<span class="hljs-string">&#x27;Current activity:&#x27;</span>, result),
-            <span class="hljs-comment">// Like above, but in plain JS.</span>
+            <span class="hljs-comment">// Like below, but in plain JS.</span>
             <span class="hljs-comment">// You may also write it like this in TS with the following directive for @typescript-eslint, in case you are using it:</span>
             <span class="hljs-comment">// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/restrict-template-expressions</span>
             <span class="hljs-function"><span class="hljs-params">e</span> =&gt;</span> <span class="hljs-built_in">console</span>.log(<span class="hljs-string">`Error: Message: <span class="hljs-subst">${e.message}</span>, code: <span class="hljs-subst">${e.code}</span>`</span>)
         );
+
+    <span class="hljs-keyword">await</span> fhemClient.execPerlCode(<span class="hljs-string">&#x27;join(&quot;\n&quot;, map(&quot;Device: $_, type: $defs{$_}{TYPE}&quot;, keys %defs))&#x27;</span>)
+        .then(
+            <span class="hljs-function">(<span class="hljs-params">result: <span class="hljs-built_in">string</span></span>) =&gt;</span> <span class="hljs-built_in">console</span>.log(<span class="hljs-string">`Your devices:\n<span class="hljs-subst">${result}</span>`</span>),
+            <span class="hljs-comment">// This is correct TS code:</span>
+            <span class="hljs-comment">// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access</span>
+            <span class="hljs-function">(<span class="hljs-params">e: <span class="hljs-built_in">Error</span></span>) =&gt;</span> <span class="hljs-built_in">console</span>.log(<span class="hljs-string">`Error: Message: <span class="hljs-subst">${e.message}</span>, code: <span class="hljs-subst">${(e <span class="hljs-keyword">as</span> <span class="hljs-built_in">any</span>).code <span class="hljs-keyword">as</span> <span class="hljs-built_in">string</span>}</span>`</span>)
+        );
+
+    <span class="hljs-comment">// Notify your companion device that your server application is shutting down</span>
+    <span class="hljs-comment">// by calling its function &#x27;serverEvent&#x27; with arguments &lt;device hash&gt;, &#x27;ServerStateChanged&#x27;, &#x27;ShuttingDown&#x27;.</span>
+    <span class="hljs-keyword">await</span> fhemClient.callFn(<span class="hljs-string">&#x27;myDevice&#x27;</span>, <span class="hljs-string">&#x27;serverEvent&#x27;</span>, <span class="hljs-literal">true</span>, <span class="hljs-literal">false</span>, <span class="hljs-string">&#x27;ServerStateChanged&#x27;</span>, <span class="hljs-string">&#x27;ShuttingDown&#x27;</span>);
 }
 
 <span class="hljs-built_in">void</span> example()</code></pre>

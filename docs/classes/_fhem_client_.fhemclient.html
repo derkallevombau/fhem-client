@@ -3,8 +3,8 @@
 <head>
 	<meta charset="utf-8">
 	<meta http-equiv="X-UA-Compatible" content="IE=edge">
-	<title>FhemClient | fhem-client - v0.1.4</title>
-	<meta name="description" content="Documentation for fhem-client - v0.1.4">
+	<title>FhemClient | fhem-client - v0.1.5</title>
+	<meta name="description" content="Documentation for fhem-client - v0.1.5">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<link rel="stylesheet" href="../assets/css/main.css">
 </head>
@@ -22,7 +22,7 @@
 						<li class="state loading">Preparing search index...</li>
 						<li class="state failure">The search index is not available</li>
 					</ul>
-					<a href="../index.html" class="title">fhem-client - v0.1.4</a>
+					<a href="../index.html" class="title">fhem-client - v0.1.5</a>
 				</div>
 				<div class="table-cell" id="tsd-widgets">
 					<div id="tsd-filter">
@@ -170,7 +170,7 @@
 					<a name="callfn" class="tsd-anchor"></a>
 					<h3>call<wbr>Fn</h3>
 					<ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class">
-						<li class="tsd-signature tsd-kind-icon">call<wbr>Fn<span class="tsd-signature-symbol">(</span>name<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">string</span>, functionName<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">string</span>, passDevHash<span class="tsd-signature-symbol">?: </span><span class="tsd-signature-type">boolean</span>, functionReturnsHash<span class="tsd-signature-symbol">?: </span><span class="tsd-signature-type">boolean</span>, <span class="tsd-signature-symbol">...</span>args<span class="tsd-signature-symbol">: </span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">number</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">void</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">Map</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">, </span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">&gt;</span></li>
+						<li class="tsd-signature tsd-kind-icon">call<wbr>Fn<span class="tsd-signature-symbol">(</span>name<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">string</span>, functionName<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">string</span>, passDevHash<span class="tsd-signature-symbol">?: </span><span class="tsd-signature-type">boolean</span>, functionReturnsHash<span class="tsd-signature-symbol">?: </span><span class="tsd-signature-type">boolean</span>, <span class="tsd-signature-symbol">...</span>args<span class="tsd-signature-symbol">: </span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">number</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">false</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">true</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">number</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">void</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">Map</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">, </span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">&gt;</span></li>
 					</ul>
 					<ul class="tsd-descriptions">
 						<li class="tsd-description">
@@ -245,22 +245,22 @@
 								<li>
 									<h5><span class="tsd-flag ts-flagOptional">Optional</span> functionReturnsHash: <span class="tsd-signature-type">boolean</span></h5>
 									<div class="tsd-comment tsd-typography">
-										<p>Whether the function returns a hash that should be transformed into a Map. Defaults to <code>false</code>.</p>
+										<p>Whether the function returns a hash that should be transformed to a Map. Defaults to <code>false</code>.</p>
 										<p>If the function returns a hash (literal, no ref), which is just an even-sized list, you must indicate this.<br>Failing to do so will give you an array of key/value pairs.</p>
 										<p>On the other hand, if you provide true for this and the function returns an odd-sized list, the <code>Promise</code> will be rejected.<br>This parameter is meaningless if the function returns a scalar.</p>
 									</div>
 								</li>
 								<li>
-									<h5><span class="tsd-flag ts-flagRest">Rest</span> <span class="tsd-signature-symbol">...</span>args: <span class="tsd-signature-symbol">(</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">[]</span></h5>
+									<h5><span class="tsd-flag ts-flagRest">Rest</span> <span class="tsd-signature-symbol">...</span>args: <span class="tsd-signature-symbol">(</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">number</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">false</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">true</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">[]</span></h5>
 									<div class="tsd-comment tsd-typography">
 										<p>The arguments to be passed to the function.
-										If an argument is <code>undefined</code>, the function will get Perl&#39;s undef for that argument.</p>
+										If an argument is <code>undefined</code>, the function will get Perl&#39;s &#39;undef&#39; for that argument.<br>If an argument is <code>true</code> or <code>false</code>, the function will get 1 or &quot;&quot;, respectively</p>
 									</div>
 								</li>
 							</ul>
 							<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">number</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">void</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">Map</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">, </span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">&gt;</span></h4>
 							<p>A <code>Promise</code> that will be resolved with the result on success or rejected with one of the following errors.</p>
-							<p>If the function cannot be found in the module hash or returns undef, the result will be undefined.</p>
+							<p>If the function cannot be found in the module hash or returns &#39;undef&#39;, the result will be <code>undefined</code>.</p>
 							<p>If the function returns a scalar or a list, the result will be a value or an array, respectively.<br>Furthermore, if the list is even-sized and <code>functionReturnsHash === true</code>, the result will be a Map.</p>
 							<p>In either case, numbers will be returned as numbers, not as strings.</p>
 						</li>
