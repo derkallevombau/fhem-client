@@ -25,6 +25,7 @@
  * See the [full documentation](https://derkallevombau.github.io/fhem-client/) for details.
  *
  * ## Changelog
+ * - 0.1.5: {@linkcode FhemClient.callFn} now accepts `boolean` args.
  * - 0.1.4:
  *     - Retry on error via
  *         - Property {@linkcode Options.retryIntervals} of `options` param of {@linkcode FhemClient.constructor}.
@@ -66,21 +67,26 @@
  *
  * async function example()
  * {
- * 	await fhemClient.execPerlCode('join("\n", map("Device: $_, type: $defs{$_}{TYPE}", keys %defs))')
- * 		.then(
- * 			result => console.log(`Your devices:\n${result as string}`),
- * 			// This is correct TS code:
- * 			e => console.log(`Error: Message: ${(e as Error).message}, code: ${(e as Error)['code'] as string}`)
- * 		);
- *
  * 	await fhemClient.execCmd('get hub currentActivity')
  * 		.then(
  * 			result => console.log('Current activity:', result),
- * 			// Like above, but in plain JS.
+ * 			// Like below, but in plain JS.
  * 			// You may also write it like this in TS with the following directive for @typescript-eslint, in case you are using it:
  * 			// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/restrict-template-expressions
  * 			e => console.log(`Error: Message: ${e.message}, code: ${e.code}`)
  * 		);
+ *
+ * 	await fhemClient.execPerlCode('join("\n", map("Device: $_, type: $defs{$_}{TYPE}", keys %defs))')
+ * 		.then(
+ * 			(result: string) => console.log(`Your devices:\n${result}`),
+ * 			// This is correct TS code:
+ *			// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+ * 			(e: Error) => console.log(`Error: Message: ${e.message}, code: ${(e as any).code as string}`)
+ * 		);
+ *
+ * 	// Notify your companion device that your server application is shutting down
+ * 	// by calling its function 'serverEvent' with arguments <device hash>, 'ServerStateChanged', 'ShuttingDown'.
+ * 	await fhemClient.callFn('myDevice', 'serverEvent', true, false, 'ServerStateChanged', 'ShuttingDown');
  * }
  *
  * void example()
@@ -322,7 +328,7 @@ class FhemClient
 	 * @param name - The name of the device to call the function for.
 	 * @param functionName - The name of the function as used to register it in the module hash.
 	 * @param passDevHash - Whether the ref to the instance hash of the device should be passed to the function as first argument. Defaults to `false`.
-	 * @param functionReturnsHash - Whether the function returns a hash that should be transformed into a Map. Defaults to `false`.
+	 * @param functionReturnsHash - Whether the function returns a hash that should be transformed to a Map. Defaults to `false`.
 	 *
 	 * If the function returns a hash (literal, no ref), which is just an even-sized list, you must indicate this.\
 	 * Failing to do so will give you an array of key/value pairs.
@@ -330,10 +336,11 @@ class FhemClient
 	 * On the other hand, if you provide true for this and the function returns an odd-sized list, the `Promise` will be rejected.\
 	 * This parameter is meaningless if the function returns a scalar.
 	 * @param args - The arguments to be passed to the function.
-	 * If an argument is `undefined`, the function will get Perl's undef for that argument.
+	 * If an argument is `undefined`, the function will get Perl's 'undef' for that argument.\
+	 * If an argument is `true` or `false`, the function will get 1 or "", respectively
 	 * @returns A `Promise` that will be resolved with the result on success or rejected with one of the following errors.
 	 *
-	 * If the function cannot be found in the module hash or returns undef, the result will be undefined.
+	 * If the function cannot be found in the module hash or returns 'undef', the result will be `undefined`.
 	 *
 	 * If the function returns a scalar or a list, the result will be a value or an array, respectively.\
 	 * Furthermore, if the list is even-sized and `functionReturnsHash === true`, the result will be a Map.
@@ -356,7 +363,7 @@ class FhemClient
 	 * @throws `Error` with code 'EFHEMCL_CF_ODDLIST' in case `functionReturnsHash === true` and the function returned
 	 * an odd-sized list.
 	 */
-	callFn(name: string, functionName: string, passDevHash?: boolean, functionReturnsHash?: boolean, ...args: (string | number)[]): Promise<string | number | void | (string | number)[] | Map<string | number, string | number>>
+	callFn(name: string, functionName: string, passDevHash?: boolean, functionReturnsHash?: boolean, ...args: (string | number | boolean)[]): Promise<string | number | void | (string | number)[] | Map<string | number, string | number>>
 	{
 		const logger = this.logger;
 
@@ -380,11 +387,21 @@ class FhemClient
 		if (args.length)
 		{
 			// Using double quotes for string args since they could contain single quotes.
-			// N.B.: args must be of type '(string | number)[]', not 'string[] | number[]'.
+			// N.B.: args must be of type '(string | number)[]', not 'string[] | number[]'. // Oh, really?! ;)
 			//       While the former is an array whose elements can be both strings and numbers,
 			//       the latter is either an array of strings or an array of numbers.
 			//       In the latter case, the map method has a very "funny" signature...
-			const argsStr = args.map(arg => typeof arg === 'number' ? arg : `"${arg}"`).join(',');
+			const argsStr = args.map(
+				arg =>
+				{
+					switch (typeof arg)
+					{
+						case 'number': return arg;
+						case 'boolean': return arg ? 1 : '';
+						case 'string': return `"${arg}"`;
+					}
+				}
+			).join(',');
 
 			if (argsStr.includes('undefined')) // No regex matching needed, it's just a string.
 			{
