@@ -5,7 +5,7 @@ It provides the methods `execCmd`, `execPerlCode` and `callFn` to interact with 
 See the [full documentation](https://derkallevombau.github.io/fhem-client/) for details.
 
 ## Changelog
-- 0.1.5: {@linkcode FhemClient.callFn} now accepts `boolean` args.
+- 0.1.7: {@linkcode FhemClient.callFn} now accepts `boolean` args.
 - 0.1.4:
     - Retry on error via
         - Property `Options.retryIntervals` of `options` param of `FhemClient.constructor`.
