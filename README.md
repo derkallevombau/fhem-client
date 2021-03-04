@@ -46,20 +46,26 @@ fhemClient.expirationPeriod = 20000;
 
 async function example()
 {
-    await fhemClient.execPerlCode('join("\n", map("Device: $_, type: $defs{$_}{TYPE}", keys %defs))')
-        .then(
-            result => console.log(`Your devices:\n${result as string}`),
-            // This is correct TS code:
-            e => console.log(`Error: Message: ${(e as Error).message}, code: ${(e as Error)['code'] as string}`)
-        );
-    await fhemClient.execCmd('get hub currentActivity')
-        .then(
-            result => console.log('Current activity:', result),
-            // Like above, but in plain JS.
-            // You may also write it like this in TS with the following directive for @typescript-eslint, in case you are using it:
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/restrict-template-expressions
-            e => console.log(`Error: Message: ${e.message}, code: ${e.code}`)
-        );
+	await fhemClient.execCmd('get hub currentActivity')
+		.then(
+			result => console.log('Current activity:', result),
+			// Like below, but in plain JS.
+			// You may also write it like this in TS with the following directive for @typescript-eslint, in case you are using it:
+			// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/restrict-template-expressions
+			e => console.log(`Error: Message: ${e.message}, code: ${e.code}`)
+		);
+
+	await fhemClient.execPerlCode('join("\n", map("Device: $_, type: $defs{$_}{TYPE}", keys %defs))')
+		.then(
+			(result: string) => console.log(`Your devices:\n${result}`),
+			// This is correct TS code:
+		// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+			(e: Error) => console.log(`Error: Message: ${e.message}, code: ${(e as any).code as string}`)
+		);
+
+	// Notify your companion device that your server application is shutting down
+	// by calling its function 'serverEvent' with arguments <device hash>, 'ServerStateChanged', 'ShuttingDown'.
+	await fhemClient.callFn('myDevice', 'serverEvent', true, false, 'ServerStateChanged', 'ShuttingDown');
 }
 
 void example()
