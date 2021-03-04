@@ -7,7 +7,7 @@
  * See the [full documentation](https://derkallevombau.github.io/fhem-client/) for details.
  *
  * ## Changelog
- * - 0.1.5: {@linkcode FhemClient.callFn} now accepts `boolean` args.
+ * - 0.1.8: {@linkcode FhemClient.callFn} now accepts `boolean` args.
  * - 0.1.4:
  *     - Retry on error via
  *         - Property {@linkcode Options.retryIntervals} of `options` param of {@linkcode FhemClient.constructor}.
@@ -158,9 +158,9 @@ declare class FhemClient {
      *
      * On the other hand, if you provide true for this and the function returns an odd-sized list, the `Promise` will be rejected.\
      * This parameter is meaningless if the function returns a scalar.
-     * @param args - The arguments to be passed to the function.
+     * @param args - The arguments to be passed to the function.\
      * If an argument is `undefined`, the function will get Perl's 'undef' for that argument.\
-     * If an argument is `true` or `false`, the function will get 1 or "", respectively
+     * If an argument is `true` or `false`, the function will get 1 or "", respectively.
      * @returns A `Promise` that will be resolved with the result on success or rejected with one of the following errors.
      *
      * If the function cannot be found in the module hash or returns 'undef', the result will be `undefined`.
