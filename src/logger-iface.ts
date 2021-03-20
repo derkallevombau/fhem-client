@@ -7,14 +7,33 @@
 /* eslint-disable tsdoc/syntax */
 
 /** @ignore */
-type LogMethod = (level: string, ...args: any[]) => void;
+type LogMethod = (level: LogLevels, ...args: any[]) => void;
+
 /** @ignore */
 type LoggerLevelMethod = (message: any, ...args: any[]) => void;
 
-/** @ignore */
-export default interface Logger
+/**
+ * String array of common log levels.
+ */
+export const logLevels = ['trace', 'debug', 'info', 'warn', 'error', 'fatal'];
+
+/**
+ * String regexp to match a common log level.
+ */
+export const logLevelRE = '(?:trace|debug|info|warn|error|fatal)';
+
+/**
+ * Union type of common log levels.
+ */
+export type LogLevels = 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'fatal';
+
+/**
+ * Interface for a logger providing the usual log methods.
+ */
+export interface Logger
 {
-	log  : LogMethod;
+	log: LogMethod;
+	trace: LoggerLevelMethod;
 	debug: LoggerLevelMethod;
 	info : LoggerLevelMethod;
 	warn : LoggerLevelMethod;
