@@ -99,7 +99,7 @@ import * as https from 'https';
 import { URL } from 'url';
 import { strict as assert } from 'assert';
 
-import Logger from 'src/logger-iface';
+import { Logger, logLevels } from 'src/logger-iface';
 
 interface FhemOptions
 {
@@ -305,7 +305,7 @@ class FhemClient
 
 			const dummyFn = () => { /* Nothing to do. */ };
 
-			for (const fnName of ['log', 'debug', 'info', 'warn', 'error']) this.logger[fnName] = dummyFn;
+			for (const fnName of ['log', ...logLevels]) this.logger[fnName] = dummyFn;
 		}
 	}
 
