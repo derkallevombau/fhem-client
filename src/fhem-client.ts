@@ -25,6 +25,8 @@
  * See the [full documentation](https://derkallevombau.github.io/fhem-client/) for details.
  *
  * ## Changelog
+ * - 0.1.9: Fixed tsc error "Cannot find module '../logger-iface' or its corresponding type declarations"
+ *          when compiling a project that imports fhem-client.
  * - 0.1.8: {@linkcode FhemClient.callFn} now accepts `boolean` args.
  * - 0.1.4:
  *     - Retry on error via
@@ -99,7 +101,7 @@ import * as https from 'https';
 import { URL } from 'url';
 import { strict as assert } from 'assert';
 
-import { Logger, logLevels } from 'src/logger-iface';
+import { Logger, logLevels } from './logger-iface';
 
 interface FhemOptions
 {
