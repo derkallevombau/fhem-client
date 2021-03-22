@@ -13,7 +13,6 @@
 		// This will allow editors such as VS Code to go to the original .ts file when using features
 		// like Go to Definition.
 		"declarationMap": true,
-		"baseUrl": "./",
 		"pretty": true,
 		"noEmitOnError": true,
 		"listEmittedFiles": true,
