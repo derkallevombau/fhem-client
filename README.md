@@ -5,6 +5,8 @@ It provides the methods `execCmd`, `execPerlCode` and `callFn` to interact with 
 See the [full documentation](https://derkallevombau.github.io/fhem-client/) for details.
 
 ## Changelog
+- 0.1.9: Fixed tsc error "Cannot find module 'src/logger-iface' or its corresponding type declarations"
+         when compiling a project that imports fhem-client.
 - 0.1.8: `FhemClient.callFn` now accepts `boolean` args.
 - 0.1.4:
     - Retry on error via
