@@ -14,21 +14,25 @@ type LoggerLevelMethod = (message: any, ...args: any[]) => void;
 
 /**
  * String array of common log levels.
+ * @ignore
  */
 export const logLevels = ['trace', 'debug', 'info', 'warn', 'error', 'fatal'];
 
 /**
  * String regexp to match a common log level.
+ * @ignore
  */
 export const logLevelRE = '(?:trace|debug|info|warn|error|fatal)';
 
 /**
  * Union type of common log levels.
+ * @ignore
  */
 export type LogLevels = 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'fatal';
 
 /**
  * Interface for a logger providing the usual log methods.
+ * @ignore
  */
 export interface Logger
 {
