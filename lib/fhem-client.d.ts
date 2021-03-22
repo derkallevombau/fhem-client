@@ -77,7 +77,7 @@
  */
 import * as http from 'http';
 import * as https from 'https';
-import Logger from 'src/logger-iface';
+import { Logger } from './logger-iface';
 interface FhemOptions {
     /**
      * The URL of the desired FHEMWEB device: 'http[s]://&lt;host&gt;:&lt;port&gt;/webname'.
