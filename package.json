@@ -5,8 +5,7 @@
 	"main": "lib/fhem-client.js",
 	"types": "lib/fhem-client.d.ts",
 	"files": [
-		"lib",
-		"src"
+		"lib"
 	],
 	"author": "derkallevombau",
 	"license": "MIT",
@@ -31,8 +30,8 @@
 		"generateDts": "tsc -p ./ --outDir \"$npm_package_config_outDir\" --emitDeclarationOnly true",
 		"compile": "npm run generateJs && npm run generateDts && npm run generateDoc",
 		"watch": "tsc --watch -p ./ --noEmitOnError false",
-		"lint": "eslint --ext .ts \"$npm_package_config_rootDir\"",
-		"generateDoc": "typedoc --options typedoc.js --inputFiles \"$npm_package_config_rootDir\" && touch docs/.nojekyll",
+		"lint": "eslint --ext .ts src",
+		"generateDoc": "typedoc --options typedoc.js --inputFiles src && touch docs/.nojekyll",
 		"lintCfgTsAdd": "git subtree add -P lintcfg-ts --squash \"$npm_package_config_lintCfgSubtreeRepoBasePath\"ts master && ln -s lintcfg-ts/.eslintrc.js .eslintrc.js",
 		"lintCfgTsPush": "git subtree push -P lintcfg-ts \"$npm_package_config_lintCfgSubtreeRepoBasePath\"ts master",
 		"lintCfgTsPull": "git subtree pull -P lintcfg-ts --squash \"$npm_package_config_lintCfgSubtreeRepoBasePath\"ts master",
